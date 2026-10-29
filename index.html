@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="fr" data-theme="auto">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>LinguaCoach</title>
+  <meta name="description" content="LinguaCoach : coaching linguistique avec des agents IA — écriture, écoute et expression orale.">
+  <meta name="theme-color" content="#f6f4ef">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <a id="skip" class="skip" href="#view">Aller au contenu</a>
+  <header class="topbar">
+    <span id="app-title" class="brand">LinguaCoach</span>
+    <span id="offline-pill" class="pill" role="status" hidden>Hors ligne</span>
+  </header>
+  <main id="view" tabindex="-1"><p class="muted">Chargement…</p></main>
+  <nav id="nav" class="bottom-nav" aria-label="Navigation principale"></nav>
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+  <noscript><p class="banner banner-error">LinguaCoach nécessite JavaScript.</p></noscript>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
