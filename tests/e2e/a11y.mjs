@@ -11,7 +11,7 @@ for (const theme of ['light', 'dark']) {
   await page.goto(BASE + '?debug'); await page.waitForSelector('#view h1');
   await page.evaluate((t) => window.__lc.ctx.setPrefs({ theme: t }), theme);
   await page.evaluate(async () => { await window.__lc.ctx.logActivity({ skill: 'listening', type: 'story', score: { correct: 1, total: 2 } }); });
-  for (const r of ['home', 'writing', 'listening', 'speaking', 'settings', 'review']) {
+  for (const r of ['home', 'writing', 'listening', 'speaking', 'conversation', 'settings', 'review']) {
     await page.goto(`${BASE}?debug#/${r}`); await page.waitForSelector('#view h1'); await page.waitForTimeout(300);
     await page.evaluate(axeSrc);
     const res = await page.evaluate(() => axe.run(document, { runOnly: ['wcag2a', 'wcag2aa', 'wcag21aa', 'best-practice'] }));

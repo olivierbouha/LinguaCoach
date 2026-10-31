@@ -5,7 +5,7 @@
 import { h } from '../utils.js';
 import { select, field, banner, toast, confirmDialog, formDialog, spinner } from '../ui.js';
 import {
-  LEVELS, TOPICS, PROFILES, NATIVE_LANGS, CORRECTION_STYLES, PROVIDER_IDS, UI_LANGS, getLanguage,
+  LEVELS, TOPICS, PROFILES, NATIVE_LANGS, CORRECTION_STYLES, PROVIDER_IDS, UI_LANGS, LANGUAGES, getLanguage,
 } from '../config.js';
 import { PROVIDERS } from '../ai/providers/index.js';
 import { describeVoice, voicesForLanguage, pickVoice } from '../speech.js';
@@ -23,6 +23,7 @@ export async function render(root, ctx) {
   function learning(p) {
     const lang = getLanguage(p);
     return sec(t('set.learning'),
+      field(t('set.language'), select(Object.values(LANGUAGES).map((l) => [l.id, l.label]), p.language, (v) => { set({ language: v, accent: LANGUAGES[v].defaultAccent }); draw(); })),
       field(t('set.accent'), select(Object.values(lang.accents).map((a) => [a.code, `${a.label} (${a.code})`]), p.accent, (v) => { set({ accent: v }); draw(); })),
       field(t('common.level'), select(LEVELS.map((l) => [l, l]), p.level, (v) => set({ level: v }))),
       field(t('common.topic'), select(Object.entries(TOPICS).map(([k, v]) => [k, v.label]), p.topic, (v) => set({ topic: v }))),

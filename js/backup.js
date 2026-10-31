@@ -74,6 +74,7 @@ const VALIDATORS = {
       updatedAt: isNum(r.updatedAt) ? r.updatedAt : 0, topic: isStr(r.topic, 50) ? r.topic : '',
       level: isStr(r.level, 5) ? r.level : '', accent: isStr(r.accent, 20) ? r.accent : '',
       profile: isStr(r.profile, 50) ? r.profile : '', messages,
+      ...(r.kind === 'voice' ? { kind: 'voice' } : {}),
     };
   },
   activities(r, i) {

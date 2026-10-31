@@ -104,6 +104,42 @@ export function speakSequence(segments, { win = globalThis, lang, voice = null, 
   return { done, cancel() { canceled = true; synth.cancel(); finish('canceled'); } };
 }
 
+/**
+ * File de lecture : on peut y ajouter des phrases au fil de l'eau (réponse de l'IA en streaming)
+ * sans couper ce qui est en cours (contrairement à speakSequence).
+ * @returns {{enqueue(text), cancel(), whenIdle(): Promise<void>, speaking: () => boolean}}
+ */
+export function createSpeechQueue({ win = globalThis, voice = null, lang, rate = 1, onStart, onIdle } = {}) {
+  const synth = win.speechSynthesis;
+  const q = [];
+  let busy = false;
+  let gen = 0;
+  let waiters = [];
+  const settle = () => { const w = waiters; waiters = []; w.forEach((r) => r()); onIdle?.(); };
+  const next = (g) => {
+    if (g !== gen) return;
+    if (!q.length) { busy = false; return settle(); }
+    const text = q.shift();
+    const u = new win.SpeechSynthesisUtterance(text);
+    if (voice) u.voice = voice;
+    u.lang = voice?.lang ?? lang;
+    u.rate = rate;
+    u.onend = () => next(g);
+    u.onerror = (e) => { if (e.error === 'canceled' || e.error === 'interrupted') return; next(g); };
+    synth.speak(u);
+  };
+  return {
+    enqueue(text) {
+      if (!synth || !text) return;
+      q.push(text);
+      if (!busy) { busy = true; onStart?.(); next(gen); }
+    },
+    cancel() { gen++; q.length = 0; const was = busy; busy = false; synth?.cancel(); if (was) settle(); },
+    whenIdle() { return busy ? new Promise((r) => waiters.push(r)) : Promise.resolve(); },
+    speaking: () => busy,
+  };
+}
+
 export function stopSpeaking(win = globalThis) { win.speechSynthesis?.cancel(); }
 
 /**

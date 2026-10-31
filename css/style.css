@@ -140,3 +140,12 @@ fieldset { border: 1px solid var(--border); border-radius: 14px; margin: 10px 0;
 .slot { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 4px; } .status { min-height: 1.4rem; margin: 6px 0; word-break: break-word; }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* Conversation orale */
+.mic-btn { min-width: 9.5rem; }
+.mic-btn.is-listening { background: var(--danger, #b3261e); border-color: var(--danger, #b3261e); animation: lc-pulse 1.4s ease-in-out infinite; }
+@keyframes lc-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(179, 38, 30, .45); } 50% { box-shadow: 0 0 0 10px rgba(179, 38, 30, 0); } }
+@media (prefers-reduced-motion: reduce) { .mic-btn.is-listening { animation: none; } }
+.conv-status { min-height: 1.4em; color: var(--muted); margin: .25rem 0; }
+.conv-opts { margin-top: 1rem; }
+.msg .tip { font-size: .9rem; color: var(--muted); }

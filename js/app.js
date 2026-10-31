@@ -17,16 +17,18 @@ import * as home from './modules/home.js';
 import * as writing from './modules/writing.js';
 import * as listening from './modules/listening.js';
 import * as speaking from './modules/speaking.js';
+import * as conversation from './modules/conversation.js';
 import * as settings from './modules/settings.js';
 import * as review from './modules/review.js';
 import './install.js';
 
-const ROUTES = { home, writing, listening, speaking, settings, review };
+const ROUTES = { home, writing, listening, speaking, conversation, settings, review };
 const NAV = [
   ['home', 'nav.home', 'home'],
   ['writing', 'nav.writing', 'write'],
   ['listening', 'nav.listening', 'listen'],
   ['speaking', 'nav.speaking', 'speak'],
+  ['conversation', 'nav.conversation', 'chat'],
   ['settings', 'nav.settings', 'settings'],
 ];
 

@@ -3,9 +3,10 @@
  * Pour ajouter une langue : créer content/<code>.js (mêmes exports que en.js) et l'enregistrer dans PACKS.
  */
 import * as en from './en.js';
+import * as nl from './nl.js';
 import { LEVELS, getAccent, getLanguage } from '../config.js';
 
-const PACKS = { en };
+const PACKS = { en, nl };
 
 /** Remplace {clé} par la variante lexicale de l'accent (sinon laisse le mot brut). */
 export function resolveLex(text, lexicon, region) {

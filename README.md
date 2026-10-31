@@ -1,6 +1,6 @@
 # LinguaCoach
 
-PWA de coaching linguistique (anglais en premier) avec des agents IA : **écriture**, **écoute**, **expression orale**.
+PWA de coaching linguistique (**anglais** et **néerlandais**, NL/BE) avec des agents IA : **écriture**, **écoute**, **expression orale** et **conversation orale** (v1.1).
 HTML / CSS / JavaScript modernes (modules ES), **sans framework, sans étape de build**, déployable sur n'importe quel hébergement statique HTTPS.
 
 > **Statut honnête** : le code, les tests automatisés et les vérifications dans Chromium sont réels (voir « Tests »).
@@ -105,6 +105,18 @@ Il suffirait d'ajouter un adaptateur `custom` pointant vers ce backend (même pr
 - Sans `SpeechRecognition` (Firefox…), l'enregistrement MediaRecorder permet de se réécouter et de comparer à l'oreille.
 - Analyse audio par IA : conversion en WAV 16 kHz mono, envoi uniquement à un fournisseur déclarant `audioInput` (Gemini ici), après consentement.
 
+### Conversation orale (onglet « Parler », v1.1)
+
+- Vous parlez (reconnaissance vocale du navigateur, dans la langue/variante choisie), l'IA répond en streaming et sa réponse est **lue à voix haute phrase par phrase** dès qu'elle arrive. Option mains libres (réécoute automatique après la réponse), envoi automatique, affichage du texte facultatif, saisie clavier de repli.
+- L'IA reçoit **uniquement la transcription** (texte) : elle ne juge pas votre prononciation. Aucun audio n'est conservé. Le consentement avant envoi s'applique comme ailleurs.
+- La consigne demande des réponses courtes sans markdown, des corrections implicites et un conseil facultatif `[TIP]` (affiché, jamais lu).
+- Les conversations orales sont enregistrées localement (`kind: 'voice'`), exportées dans la sauvegarde, et séparées de celles de l'écriture.
+- La reconnaissance est coupée pendant que l'IA parle (évite l'écho) ; avec haut-parleurs, un casque reste préférable.
+
+### Néerlandais
+
+Réglages › Apprentissage › Langue apprise. Variantes `nl-NL` et `nl-BE` (néerlandais standard flamand, pas de dialecte), lexique `{mobile}` → mobiel/gsm, friet/frieten, spoor/perron, broodje/pistolet. Contenu local : 25 phrases, 5 dialogues, 10 mini-histoires. Les consignes IA nomment la langue et la variante. Les voix `nl-BE`/`nl-NL` dépendent de l'appareil.
+
 ## 6. Déploiement HTTPS (hébergement statique)
 
 Copier le dossier (sans `tests/`, `package.json`, `README.md` si l'on veut) sur : GitHub Pages, Netlify, Cloudflare Pages, Vercel, S3+CloudFront, nginx… HTTPS obligatoire (service worker, micro, installation).
@@ -122,10 +134,10 @@ Réglages › Données : export JSON (préférences non sensibles, conversations
 ## 8. Tests
 
 ```bash
-npm test                                   # 96 tests unitaires/intégration (node:test, aucun réseau)
+npm test                                   # 106 tests unitaires/intégration (node:test, aucun réseau)
 python3 -m http.server 8080 &              # puis, avec Playwright installé :
-node tests/e2e/smoke.mjs                   # 46 vérifications dans Chromium (API IA simulées via page.route)
-npm i axe-core && node tests/e2e/a11y.mjs node_modules/axe-core/axe.min.js   # audit axe-core, 12 vues
+node tests/e2e/smoke.mjs                   # 59 vérifications dans Chromium (API IA simulées via page.route)
+npm i axe-core && node tests/e2e/a11y.mjs node_modules/axe-core/axe.min.js   # audit axe-core, 14 vues (7 écrans × clair/sombre)
 ```
 
 ### Résultats réels (exécutés pendant le développement)
@@ -161,5 +173,6 @@ Des bugs réels trouvés et corrigés grâce à ces tests : lecture de flux muet
 - Une clé dans le navigateur reste exposée (voir § 4). Pas de backend fourni.
 - Appels directs depuis le navigateur : dépendent du CORS du fournisseur (OpenAI, Gemini et Anthropic l'autorisent à ce jour avec les en-têtes utilisés ; un fournisseur personnalisé doit l'autoriser).
 - Le stockage du navigateur peut être purgé (surtout iOS) : exportez régulièrement ; un bouton demande le stockage persistant.
-- Interface en anglais : partielle (repli sur le français). Contenu local : 40 exercices (25 phrases, 5 dialogues, 10 mini-histoires) ; l'IA peut en générer d'autres.
+- Interface en anglais : partielle (repli sur le français). Contenu local : 40 exercices par langue (25 phrases, 5 dialogues, 10 mini-histoires) ; contenu néerlandais écrit sans relecture par un natif ; l'IA peut en générer d'autres.
+- Conversation orale : testée uniquement avec une fausse reconnaissance/synthèse et une IA simulée dans Chromium ; qualité réelle de la reconnaissance du néerlandais, latence et écho non vérifiés.
 - Pas de tests de charge, de revue de sécurité externe ni d'audit manuel d'accessibilité.

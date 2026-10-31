@@ -3,10 +3,12 @@
  * Fonctionne entièrement hors ligne et sans IA.
  */
 import { h } from '../utils.js';
+import { getLanguage } from '../config.js';
 import { dueCards, gradeCard, newCard, GRADES } from '../progress.js';
 
 export async function render(root, ctx) {
   const { t, store } = ctx;
+  const L = ctx.prefs().language; // langue apprise (attribut lang des textes affichés)
   let cards = [];
   let queue = [];
   let revealed = false;
@@ -42,7 +44,7 @@ export async function render(root, ctx) {
     const block = card
       ? h('section', { class: 'card review-card', 'aria-live': 'polite' },
         h('p', { class: 'muted' }, t('review.remaining', { n: queue.length }), ' · ', card._col === 'errors' ? t('review.kindError') : t('review.kindVocab')),
-        h('p', { class: 'big-text', lang: 'en' }, card.front),
+        h('p', { class: 'big-text', lang: L }, card.front),
         revealed
           ? [h('p', { class: 'answer' }, card.back),
             h('div', { class: 'btn-row' },
@@ -55,12 +57,12 @@ export async function render(root, ctx) {
       h('h2', {}, t('review.all', { n: cards.length })),
       cards.length === 0 ? h('p', { class: 'muted' }, t('review.emptyHint'))
         : h('ul', { class: 'list' }, [...cards].sort((a, b) => a.due - b.due).map((c) => h('li', { class: 'list-item' },
-          h('span', {}, h('strong', { lang: 'en' }, c.front), ' — ', c.back),
+          h('span', {}, h('strong', { lang: L }, c.front), ' — ', c.back),
           h('button', { class: 'btn btn-small', type: 'button', 'aria-label': t('review.deleteAria', { w: c.front }), onclick: async () => { await store.delete(c._col, c.id); await load(); draw(); } }, t('common.delete'))))));
 
     const form = h('form', { class: 'card', onsubmit: addManual },
       h('h2', {}, t('review.addTitle')),
-      h('div', { class: 'field' }, h('label', { for: 'rv-front' }, t('review.front')), h('input', { id: 'rv-front', name: 'front', class: 'input', lang: 'en', required: true, maxlength: 200 })),
+      h('div', { class: 'field' }, h('label', { for: 'rv-front' }, t('review.front', { lang: getLanguage(ctx.prefs()).label.toLowerCase() })), h('input', { id: 'rv-front', name: 'front', class: 'input', lang: L, required: true, maxlength: 200 })),
       h('div', { class: 'field' }, h('label', { for: 'rv-back' }, t('review.back')), h('input', { id: 'rv-back', name: 'back', class: 'input', required: true, maxlength: 400 })),
       h('button', { class: 'btn', type: 'submit' }, t('common.add')));
 
