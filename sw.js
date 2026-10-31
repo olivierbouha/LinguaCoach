@@ -11,7 +11,7 @@
  *
  * Pour publier une nouvelle version : modifier VERSION (et la liste si des fichiers changent).
  */
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 const CACHE = `linguacoach-${VERSION}`;
 const PRECACHE = [
   './',
@@ -36,6 +36,9 @@ const PRECACHE = [
   'js/backup.js',
   'js/config.js',
   'js/content/en.js',
+  'js/content/nl.js',
+  'js/conversation-utils.js',
+  'js/modules/conversation.js',
   'js/content/index.js',
   'js/i18n.js',
   'js/install.js',

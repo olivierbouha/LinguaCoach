@@ -5,7 +5,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compareTexts, normalizeWords, levenshtein } from '../js/text-compare.js';
 import { computeStats, suggestLevelShift, suggestNext, newCard, gradeCard, dueCards, GRADES } from '../js/progress.js';
-import { pickVoice, describeVoice, speechSupport, splitSentences } from '../js/speech.js';
+import { pickVoice, describeVoice, speechSupport, splitSentences, createSpeechQueue } from '../js/speech.js';
+import { cleanForSpeech, splitTip, createSentenceStreamer } from '../js/conversation-utils.js';
+import { buildHistory } from '../js/modules/conversation.js';
+import { conversationSystemPrompt } from '../js/ai/prompts.js';
+import * as NL from '../js/content/nl.js';
 import { SSEParser } from '../js/ai/http.js';
 import { parseWritingReply, parseSections, extractJson, normalizeGeneratedExercise, writingSystemPrompt, speakingSystemPrompt, listeningGenSystemPrompt, SPEAKING_SECTIONS } from '../js/ai/prompts.js';
 import { sanitizePrefs } from '../js/storage.js';
@@ -247,4 +251,69 @@ test('Sécurité du code source : aucune clé API codée en dur, pas d\'innerHTM
     assert.ok(!/\.innerHTML\s*=|insertAdjacentHTML|document\.write|eval\(/.test(s), `API HTML dangereuse dans ${f}`);
     assert.ok(!/['"`](gpt-[\w.-]+|gemini-[\w.-]+|claude-[\w.-]+)['"`]/.test(s), `modèle codé en dur dans ${f}`);
   }
+});
+
+/* ---------- néerlandais ---------- */
+test('Néerlandais : sanitizePrefs accepte nl/nl-BE, corrige un accent d\'une autre langue', () => {
+  assert.equal(P({ language: 'nl', accent: 'nl-BE' }).accent, 'nl-BE');
+  assert.equal(P({ language: 'nl', accent: 'en-US' }).accent, 'nl-NL');
+  assert.equal(P({ language: 'xx' }).language, 'en');
+});
+test('Néerlandais : bibliothèque complète, variantes {clé} résolues NL vs BE, aucun accolade restant', () => {
+  const nl = getLibrary(P({ language: 'nl', accent: 'nl-NL' }));
+  const be = getLibrary(P({ language: 'nl', accent: 'nl-BE' }));
+  assert.ok(nl.phrases.length >= 25 && nl.dialogues.length >= 5 && nl.stories.length >= 10);
+  const all = JSON.stringify(nl) + JSON.stringify(be);
+  assert.ok(!/\{\w+\}/.test(all), 'accolade non résolue');
+  assert.ok(nl.phrases.some((p) => p.text.includes('friet')) && be.phrases.some((p) => p.text.includes('frieten')));
+  assert.ok(be.phrases.some((p) => p.text.includes('pistolet')) && be.phrases.some((p) => p.text.includes('perron')));
+  for (const k of Object.keys(NL.LEXICON)) assert.ok(NL.LEXICON[k].NL && NL.LEXICON[k].BE);
+  for (const d of [...nl.dialogues, ...nl.stories]) for (const q of d.questions) assert.ok(q.answer >= 0 && q.answer < q.options.length, d.id);
+  for (const topic of Object.keys(nl.writingPrompts)) assert.ok(nl.writingPrompts[topic].length >= 3);
+});
+test('Néerlandais : les consignes IA nomment le néerlandais et la variante', () => {
+  const sys = writingSystemPrompt(P({ language: 'nl', accent: 'nl-BE' }));
+  assert.match(sys, /Dutch/); assert.match(sys, /Belgique|Belgian/); assert.doesNotMatch(sys, /English/);
+});
+
+/* ---------- conversation orale ---------- */
+test('cleanForSpeech : retire markdown, liens et émojis', () => {
+  assert.equal(cleanForSpeech('**Hallo** 😀 [site](http://x.y) zie https://a.b/c `code`'), 'Hallo site zie code');
+});
+test('splitTip : le conseil [TIP] est séparé du texte parlé', () => {
+  assert.deepEqual(splitTip('Hello! How are you? [TIP] Dites « I am »'), { spoken: 'Hello! How are you?', tip: 'Dites « I am »' });
+  assert.deepEqual(splitTip('Hi.'), { spoken: 'Hi.', tip: '' });
+});
+test('createSentenceStreamer : phrases complètes au fil du flux, marqueur coupé en deux jetons, jamais de [TIP] lu', () => {
+  const out = []; const s = createSentenceStreamer((x) => out.push(x));
+  for (const tok of ['Hall', 'o! **Hoe ', 'gaat het?** Ik ben blij. Wat doe je', ' vandaag? [TI', 'P] Gebruik "ik ben".']) s.push(tok);
+  const r = s.end();
+  assert.deepEqual(out, ['Hallo!', 'Hoe gaat het?', 'Ik ben blij.', 'Wat doe je vandaag?']);
+  assert.equal(r.tip, 'Gebruik "ik ben".');
+});
+test('createSentenceStreamer : dernière phrase sans ponctuation lue en fin de flux ; crochet ordinaire conservé', () => {
+  const out = []; const s = createSentenceStreamer((x) => out.push(x));
+  s.push('Prima, tot [morgen'); s.push(']'); s.end();
+  assert.equal(out.length, 1); assert.match(out[0], /^Prima, tot \[morgen\]$/);
+});
+test('buildHistory : commence toujours par un message user', () => {
+  assert.equal(buildHistory([{ role: 'assistant', content: 'Hi' }])[0].role, 'user');
+  assert.equal(buildHistory([]).length, 1);
+  const h = buildHistory([{ role: 'user', content: 'a' }, { role: 'assistant', content: 'b' }]);
+  assert.deepEqual(h.map((m) => m.role), ['user', 'assistant']);
+});
+test('conversationSystemPrompt : réponses courtes parlées, pas de markdown, pas de jugement de prononciation', () => {
+  const sys = conversationSystemPrompt(P({ language: 'nl', accent: 'nl-NL' }));
+  assert.match(sys, /read aloud/); assert.match(sys, /no markdown/); assert.match(sys, /\[TIP\]/); assert.match(sys, /never claim to have heard/i);
+});
+test('createSpeechQueue : lit dans l\'ordre sans couper, cancel vide la file', async () => {
+  const spoken = []; let pending = [];
+  const win = { speechSynthesis: { speak(u) { spoken.push(u.text); pending.push(u); }, cancel() { pending = []; } }, SpeechSynthesisUtterance: class { constructor(t) { this.text = t; } } };
+  const q = createSpeechQueue({ win, lang: 'nl-NL' });
+  q.enqueue('Een.'); q.enqueue('Twee.'); q.enqueue('Drie.');
+  assert.deepEqual(spoken, ['Een.']); assert.ok(q.speaking());
+  pending.shift().onend(); assert.deepEqual(spoken, ['Een.', 'Twee.']);
+  const idle = q.whenIdle();
+  q.cancel(); assert.equal(q.speaking(), false); await idle;
+  q.enqueue('Vier.'); assert.equal(spoken.at(-1), 'Vier.');
 });

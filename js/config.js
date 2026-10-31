@@ -8,7 +8,7 @@
  *   + son entrée dans PROVIDER_IDS.
  */
 
-export const APP_VERSION = '1.0.0';
+export const APP_VERSION = '1.1.0';
 export const BACKUP_FORMAT = 'linguacoach-backup';
 /** Version du format de sauvegarde. Incrémenter + ajouter une migration dans backup.js si le schéma change. */
 export const BACKUP_VERSION = 1;
@@ -33,6 +33,7 @@ export const LANGUAGES = {
   en: {
     id: 'en',
     label: 'Anglais',
+    promptName: 'English',
     contentKey: 'en',
     accents: {
       'en-US': {
@@ -61,6 +62,31 @@ export const LANGUAGES = {
       },
     },
     defaultAccent: 'en-US',
+  },
+  nl: {
+    id: 'nl',
+    label: 'Néerlandais',
+    promptName: 'Dutch',
+    contentKey: 'nl',
+    accents: {
+      'nl-NL': {
+        code: 'nl-NL',
+        label: 'Néerlandais (Pays-Bas)',
+        short: 'NL',
+        lex: 'NL',
+        promptNote:
+          'Use standard Dutch as spoken in the Netherlands (Standaardnederlands): vocabulary (mobiel, friet, broodje, spoor) and usage. Treat Belgian (Flemish) forms as legitimate regional variants, not errors.',
+      },
+      'nl-BE': {
+        code: 'nl-BE',
+        label: 'Néerlandais (Belgique / flamand)',
+        short: 'BE',
+        lex: 'BE',
+        promptNote:
+          'Use standard Belgian Dutch (Vlaams standaardtaal), not dialect: vocabulary such as gsm, frieten, pistolet, perron. Avoid strong dialect forms unless the learner is advanced. Treat Netherlands forms as legitimate regional variants, not errors.',
+      },
+    },
+    defaultAccent: 'nl-NL',
   },
 };
 

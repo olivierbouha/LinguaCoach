@@ -16,6 +16,7 @@ const RATES = [0.6, 0.8, 1, 1.2];
 
 export async function render(root, ctx) {
   const { t } = ctx;
+  const L = ctx.prefs().language; // langue apprise (attribut lang des textes affichés)
   let prefs = ctx.prefs();
   let format = 'story'; // phrase | dialogue | story
   let dictation = false;
@@ -116,13 +117,13 @@ export async function render(root, ctx) {
   /* ---------- rendu ---------- */
   function transcriptEl() {
     if (exercise.type === 'dialogue') {
-      return h('ul', { class: 'transcript', lang: 'en' }, exercise.lines.map((l, i) => h('li', { class: i === currentLine ? 'current' : '' }, h('strong', {}, `${l.speaker}: `), l.text)));
+      return h('ul', { class: 'transcript', lang: L }, exercise.lines.map((l, i) => h('li', { class: i === currentLine ? 'current' : '' }, h('strong', {}, `${l.speaker}: `), l.text)));
     }
-    return h('p', { class: 'transcript', lang: 'en' }, exercise.text);
+    return h('p', { class: 'transcript', lang: L }, exercise.text);
   }
 
   function diffEl(res) {
-    return h('p', { class: 'diff', lang: 'en' }, res.ops.map((o) => {
+    return h('p', { class: 'diff', lang: L }, res.ops.map((o) => {
       if (o.type === 'match') return h('span', { class: 'ok' }, o.exp + ' ');
       if (o.type === 'sub') return h('span', { class: o.near ? 'near' : 'bad' }, h('del', {}, o.act), ' → ', h('ins', {}, o.exp), ' ');
       if (o.type === 'del') return h('span', { class: 'bad' }, `[${o.exp}] `);
@@ -134,14 +135,14 @@ export async function render(root, ctx) {
     return h('div', {}, exercise.questions.map((q, i) => {
       const name = `q${i}`;
       return h('fieldset', { class: 'question' },
-        h('legend', {}, `${i + 1}. `, h('span', { lang: 'en' }, q.q)),
+        h('legend', {}, `${i + 1}. `, h('span', { lang: L }, q.q)),
         q.options.map((o, j) => {
           const id = `${name}-${j}`;
           const right = checked && j === q.answer;
           const wrong = checked && answers[i] === j && j !== q.answer;
           return h('div', { class: `choice ${right ? 'is-right' : ''} ${wrong ? 'is-wrong' : ''}` },
             h('input', { type: 'radio', id, name, checked: answers[i] === j, disabled: checked, onchange: () => { answers[i] = j; if (checkBtn) checkBtn.disabled = Object.keys(answers).length < exercise.questions.length; } }),
-            h('label', { for: id, lang: 'en' }, o, right ? h('span', { class: 'tag' }, ' ✓ ', t('listening.right')) : null, wrong ? h('span', { class: 'tag' }, ' ✗ ', t('listening.wrong')) : null));
+            h('label', { for: id, lang: L }, o, right ? h('span', { class: 'tag' }, ' ✓ ', t('listening.right')) : null, wrong ? h('span', { class: 'tag' }, ' ✗ ', t('listening.wrong')) : null));
         }),
         checked ? h('p', { class: 'explain' }, q.explanation) : null);
     }));
@@ -171,7 +172,7 @@ export async function render(root, ctx) {
       exercise.type === 'phrase' && dictation
         ? h('div', { class: 'dictation' },
           h('label', { for: 'l-dict' }, t('listening.dictLabel')),
-          h('textarea', { id: 'l-dict', class: 'input', rows: 3, lang: 'en', value: dictText, disabled: checked, oninput: (e) => { dictText = e.target.value; } }),
+          h('textarea', { id: 'l-dict', class: 'input', rows: 3, lang: L, value: dictText, disabled: checked, oninput: (e) => { dictText = e.target.value; } }),
           h('button', { class: 'btn btn-primary', type: 'button', disabled: checked, onclick: checkDictation }, t('listening.check')),
           dictResult ? [h('p', { role: 'status' }, t('listening.dictScore', { c: dictResult.matched, n: dictResult.expectedCount })), diffEl(dictResult),
             h('p', { class: 'hint' }, t('listening.dictLegend')), h('p', { class: 'hint' }, t('listening.dictNote'))] : null)

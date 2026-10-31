@@ -27,7 +27,7 @@ const track = (page) => { const errs = []; page.on('pageerror', (e) => errs.push
   await page.waitForSelector('#view h1');
   check('Accueil : se charge et affiche le titre', /Bonjour|Bonsoir/.test(await page.textContent('#view h1')));
   const navTexts = await page.$$eval('#nav a', (a) => a.map((x) => x.textContent.trim()));
-  check('Navigation : 5 entrées fixes', JSON.stringify(navTexts) === JSON.stringify(['Accueil', 'Écriture', 'Écoute', 'Oral', 'Réglages']), navTexts.join(','));
+  check('Navigation : 6 entrées fixes', JSON.stringify(navTexts) === JSON.stringify(['Accueil', 'Écriture', 'Écoute', 'Oral', 'Parler', 'Réglages']), navTexts.join(','));
   check('Accueil : message sans activité (aucune stat inventée)', (await page.textContent('#view')).includes('Aucune série en cours') && (await page.textContent('#view')).includes('0/3'));
   for (const r of ['writing', 'listening', 'speaking', 'settings', 'review', 'home']) {
     await page.goto(BASE + `?debug#/${r}`); await page.waitForSelector('#view h1'); await page.waitForTimeout(150);
@@ -199,6 +199,72 @@ const track = (page) => { const errs = []; page.on('pageerror', (e) => errs.push
   await ctx.setOffline(false);
   const swSrc = await (await page.request.get(BASE + 'sw.js')).text();
   check('Service worker : ne met pas en cache les requêtes cross-origin/non-GET', /origin !== self\.location\.origin/.test(swSrc));
+  await ctx.close();
+}
+
+/* ---- 6b. Conversation orale (néerlandais) : fausse reconnaissance + fausse synthèse + IA simulée ---- */
+{
+  const ctx = await newCtx({}, { noSpeech: false });
+  await ctx.addInitScript(() => {
+    window.__spoken = []; window.__said = 'Ik heb honger';
+    class FakeSR { start() { setTimeout(() => { this.onresult?.({ resultIndex: 0, results: Object.assign([Object.assign([{ transcript: window.__said, confidence: 0.9 }], { isFinal: true })], {}) }); setTimeout(() => this.onend?.(), 30); }, 50); }
+      stop() { setTimeout(() => this.onend?.(), 10); } abort() {} }
+    window.SpeechRecognition = FakeSR;
+    window.SpeechSynthesisUtterance = class { constructor(t) { this.text = t; } };
+    const voices = [{ name: 'Fake NL', lang: 'nl-NL', voiceURI: 'fake-nl', localService: true, default: true }];
+    Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: { speak(u) { window.__spoken.push(u.text); setTimeout(() => u.onend?.({}), 10); }, cancel() {}, getVoices: () => voices, addEventListener() {}, removeEventListener() {} } });
+  });
+  const page = await ctx.newPage(); const errs = track(page);
+  let bodies = []; const nonSys = (b) => b.messages.filter((m) => m.role !== 'system');
+  await page.route('https://api.openai.com/**', async (route) => {
+    bodies.push(JSON.parse(route.request().postData()));
+    const md = bodies.length === 1 ? 'Hallo! Hoe gaat het met je vandaag?' : 'Wil je iets eten? Wat lust je graag? [TIP] Zeg « ik heb honger » zonder fout.';
+    const parts = md.match(/[\s\S]{1,7}/g).map((c) => `data: ${JSON.stringify({ choices: [{ delta: { content: c } }] })}\n\n`).join('') + 'data: [DONE]\n\n';
+    await route.fulfill({ status: 200, headers: { 'content-type': 'text/event-stream', 'access-control-allow-origin': '*' }, body: parts });
+  });
+  await page.goto(BASE + '?debug#/settings'); await page.waitForSelector('#ai-primary-prov');
+  await page.selectOption('#ai-primary-prov', 'openai');
+  await page.fill('#ai-primary-model', 'test-model'); await page.dispatchEvent('#ai-primary-model', 'change');
+  await page.fill('#ai-primary-key', 'sk-test-FAKEFAKEFAKEFAKEFAKE'); await page.dispatchEvent('#ai-primary-key', 'change');
+  // sélecteur de langue
+  await page.selectOption('select:near(:text("Langue apprise"))', 'nl').catch(() => {});
+  const langOk = await page.evaluate(() => window.__lc.ctx.prefs().language);
+  if (langOk !== 'nl') await page.evaluate(() => window.__lc.ctx.setPrefs({ language: 'nl', accent: 'nl-NL' }));
+  check('Réglages : la langue apprise peut passer au néerlandais (accent par défaut nl-NL)', await page.evaluate(() => { const p = window.__lc.ctx.prefs(); return p.language === 'nl' && p.accent === 'nl-NL'; }));
+  await page.goto(BASE + '?debug#/conversation'); await page.waitForSelector('.mic-btn:not([disabled])');
+  check('Conversation : onglet accessible, bouton micro actif', (await page.textContent('#view h1')).includes('Conversation orale'));
+  await page.click('button:has-text("Commencer")'); await page.waitForSelector('dialog[open]');
+  check('Conversation : consentement demandé avant l\'envoi', bodies.length === 0);
+  await page.click('dialog button:has-text("Autoriser et envoyer")');
+  await page.waitForSelector('.msg-ai:has-text("Hallo!")', { timeout: 8000 });
+  await page.waitForFunction(() => window.__spoken.length >= 2, null, { timeout: 8000 });
+  check('Conversation : l\'IA ouvre la conversation (message d\'amorce), réponse lue phrase par phrase', nonSys(bodies[0])[0].role === 'user' && await page.evaluate(() => window.__spoken.join('|')) === 'Hallo!|Hoe gaat het met je vandaag?', await page.evaluate(() => window.__spoken.join('|')));
+  check('Conversation : consigne en néerlandais (Dutch, nl-NL) et réponse courte demandée', nonSys(bodies[0]).length === 1 && JSON.stringify(bodies[0]).includes('Dutch') && JSON.stringify(bodies[0]).includes('nl-NL'));
+  await page.evaluate(() => { window.__spoken.length = 0; });
+  await page.click('.mic-btn');
+  await page.waitForSelector('.msg-user:has-text("Ik heb honger")', { timeout: 8000 });
+  await page.waitForSelector('.msg-ai:has-text("Wil je iets eten?")', { timeout: 8000 });
+  await page.waitForFunction(() => window.__spoken.length >= 2, null, { timeout: 8000 });
+  await page.waitForFunction(() => !document.querySelector('.msg-ai .spinner'), null, { timeout: 8000 });
+  const spoken = await page.evaluate(() => window.__spoken.join('|'));
+  check('Conversation : transcription envoyée telle quelle, historique commençant par « user »', nonSys(bodies[1]).at(-1).content === 'Ik heb honger' && nonSys(bodies[1])[0].role === 'user', JSON.stringify(nonSys(bodies[1]).map((m) => m.role)));
+  check('Conversation : le conseil [TIP] est affiché mais JAMAIS lu à voix haute', spoken === 'Wil je iets eten?|Wat lust je graag?' && (await page.textContent('.msg-ai .tip')).includes('ik heb honger'), spoken);
+  const saved = await page.evaluate(async () => { const c = await window.__lc.ctx.store.all('conversations'); const a = await window.__lc.ctx.store.all('activities'); return { n: c.length, kind: c[0]?.kind, msgs: c[0]?.messages.length, act: a.filter((x) => x.type === 'conversation').length }; });
+  check('Conversation : enregistrée localement (kind voice, 3 messages), activité journalisée', saved.n === 1 && saved.kind === 'voice' && saved.msgs === 3 && saved.act === 2, JSON.stringify(saved));
+  await page.goto(BASE + '?debug#/writing'); await page.waitForSelector('#view h1');
+  check('Écriture : n\'affiche pas les conversations orales', (await page.$$('#view .msg')).length === 0);
+  const leak = await page.evaluate(async () => JSON.stringify(await window.__lc.ctx.store.all('conversations')).includes('FAKEFAKE') || localStorage.getItem('lc.prefs').includes('FAKEFAKE'));
+  check('Conversation : aucune clé dans les données de conversation', leak === false);
+  check('Conversation : aucune erreur JS', errs.length === 0, errs.join(' | '));
+  await ctx.close();
+}
+/* ---- 6c. Conversation sans reconnaissance vocale : repli clavier clair ---- */
+{
+  const ctx = await newCtx(); const page = await ctx.newPage(); const errs = track(page);
+  await page.goto(BASE + '?debug#/conversation'); await page.waitForSelector('#view h1');
+  const tx = await page.textContent('#view');
+  check('Conversation sans reconnaissance : message clair, micro désactivé, saisie texte présente', tx.includes('reconnaissance vocale n\'est pas disponible') && await page.isDisabled('.mic-btn') && (await page.$('#cv-input')) !== null);
+  check('Conversation sans reconnaissance : aucune erreur JS', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }
 

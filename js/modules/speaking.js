@@ -20,6 +20,7 @@ import { speakingSystemPrompt, speakingUserMessage, parseSections, SPEAKING_SECT
 
 export async function render(root, ctx) {
   const { t, store } = ctx;
+  const L = ctx.prefs().language; // langue apprise (attribut lang des textes affichés)
   let prefs = ctx.prefs();
   let sentence = null;
   const cursor = {};
@@ -150,7 +151,7 @@ export async function render(root, ctx) {
 
   /* ---------- rendu ---------- */
   function diffEl(c) {
-    return h('p', { class: 'diff', lang: 'en' }, c.ops.map((o) => {
+    return h('p', { class: 'diff', lang: L }, c.ops.map((o) => {
       if (o.type === 'match') return h('span', { class: 'ok' }, o.exp + ' ');
       if (o.type === 'sub') return h('span', { class: 'bad' }, h('del', {}, o.act), ' → ', h('ins', {}, o.exp), ' ');
       if (o.type === 'del') return h('span', { class: 'bad' }, `[${o.exp}] `);
@@ -173,7 +174,7 @@ export async function render(root, ctx) {
   }
 
   function resultEl() {
-    if (state === 'recording') return h('section', { class: 'card', 'aria-live': 'polite' }, h('p', { id: 'live' }, spinner(t('speaking.listening'))), h('p', { class: 'transcript live', lang: 'en', id: 'live-text' }, result?.interim ?? ''));
+    if (state === 'recording') return h('section', { class: 'card', 'aria-live': 'polite' }, h('p', { id: 'live' }, spinner(t('speaking.listening'))), h('p', { class: 'transcript live', lang: L, id: 'live-text' }, result?.interim ?? ''));
     if (state === 'processing') return h('section', { class: 'card' }, spinner(t('speaking.processing')));
     if (!result && !audio) return null;
     const c = result?.comparison;
@@ -185,7 +186,7 @@ export async function render(root, ctx) {
       c
         ? [h('h3', {}, t('speaking.recogTitle')),
           h('p', { role: 'status', class: 'score' }, t('speaking.recogScore', { c: c.matched, n: c.expectedCount })),
-          h('p', {}, h('strong', {}, t('speaking.heard')), ' ', h('span', { lang: 'en' }, result.transcript || '—')),
+          h('p', {}, h('strong', {}, t('speaking.heard')), ' ', h('span', { lang: L }, result.transcript || '—')),
           diffEl(c), h('p', { class: 'hint' }, t('speaking.diffLegend')),
           result.confidence != null ? h('p', { class: 'muted' }, t('speaking.confidence', { pct: Math.round(result.confidence * 100) })) : null,
           banner('info', t('speaking.recogCaveat'))]
@@ -220,7 +221,7 @@ export async function render(root, ctx) {
         select(Object.entries(TOPICS).map(([k, x]) => [k, x.label]), prefs.topic, (x) => { ctx.setPrefs({ topic: x }); nextSentence(); draw(); }, { id: 's-topic' })),
       h('section', { class: 'card' },
         h('h2', {}, t('speaking.model')),
-        h('p', { class: 'big-text', lang: 'en' }, sentence.text),
+        h('p', { class: 'big-text', lang: L }, sentence.text),
         h('p', { class: 'muted' }, `${t('common.level')} ${sentence.level}`),
         h('div', { class: 'btn-row' },
           h('button', { class: 'btn', type: 'button', disabled: !pick.voice, onclick: () => listenModel(false) }, icon('play', 18), ' ', t('speaking.listen')),
