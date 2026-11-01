@@ -55,11 +55,11 @@ function buildContext() {
 
     /** Voix réellement disponible pour l'accent courant (avec sa qualité de correspondance). */
     async voicePick() {
-      voicesCache ??= await loadVoices();
+      if (!voicesCache?.length) voicesCache = await loadVoices(globalThis, 3000); // ne jamais mémoriser une liste vide (Android : voix chargées tardivement)
       const p = store.getPrefs();
       return pickVoice(voicesCache, p.accent, { preferredURI: p.voiceURI });
     },
-    async allVoices() { return (voicesCache ??= await loadVoices()); },
+    async allVoices() { if (!voicesCache?.length) voicesCache = await loadVoices(globalThis, 3000); return voicesCache; },
 
     /** Enregistre une activité réellement accomplie (alimente objectifs, série, progression). */
     async logActivity(a) {

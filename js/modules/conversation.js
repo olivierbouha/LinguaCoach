@@ -251,9 +251,12 @@ export async function render(root, ctx) {
     const p = ctx.prefs();
     const tu = tutor();
     const pick = support.synthesis ? await ctx.voicePick() : { voice: null };
-    if (!pick.voice && support.synthesis) toast(t('speech.noVoice'), { kind: 'warn' });
+    // Sur certains Android, getVoices() reste vide alors que la synthèse fonctionne avec la seule langue : on tente alors la lecture
+    // (voix « non vérifiée »). Si des voix existent mais aucune de la bonne langue, on ne lit pas (honnêteté sur l'accent).
+    const canSpeak = support.synthesis && (!!pick.voice || (await ctx.allVoices()).length === 0);
+    if (support.synthesis && !canSpeak) toast(t('speech.noVoice'), { kind: 'warn' });
     queue = createSpeechQueue({ voice: pick.voice, lang: getAccent(p).code, rate: p.speechRate, pitch: tu.pitch, onStart: () => { if (state === 'thinking' || state === 'idle') setState('speaking'); } });
-    const mk = () => createSentenceStreamer((s) => { if (pick.voice) queue.enqueue(s); });
+    const mk = () => createSentenceStreamer((s) => { if (canSpeak) queue.enqueue(s); });
     let streamer = mk();
     const system = conversationSystemPrompt(p, { persona: tu.persona, scenario: getScenario(conv.scenarioId).setup });
     let ok = false;
