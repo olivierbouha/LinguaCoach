@@ -10,6 +10,9 @@ import { cleanForSpeech, splitTip, createSentenceStreamer } from '../js/conversa
 import { buildHistory } from '../js/modules/conversation.js';
 import { conversationSystemPrompt } from '../js/ai/prompts.js';
 import * as NL from '../js/content/nl.js';
+import { TUTORS, SCENARIOS, getTutor, getScenario, scenariosForLevel } from '../js/tutors.js';
+import { sessionSummarySystemPrompt, normalizeSessionSummary } from '../js/ai/prompts.js';
+import { sessionStats, fmtDuration } from '../js/modules/conversation.js';
 import { SSEParser } from '../js/ai/http.js';
 import { parseWritingReply, parseSections, extractJson, normalizeGeneratedExercise, writingSystemPrompt, speakingSystemPrompt, listeningGenSystemPrompt, SPEAKING_SECTIONS } from '../js/ai/prompts.js';
 import { sanitizePrefs } from '../js/storage.js';
@@ -316,4 +319,39 @@ test('createSpeechQueue : lit dans l\'ordre sans couper, cancel vide la file', a
   const idle = q.whenIdle();
   q.cancel(); assert.equal(q.speaking(), false); await idle;
   q.enqueue('Vier.'); assert.equal(spoken.at(-1), 'Vier.');
+});
+
+/* ---------- tuteurs, scénarios, bilan ---------- */
+test('Tuteurs et scénarios : identifiants uniques, repli sûr, filtrage par niveau', () => {
+  assert.equal(new Set(TUTORS.map((x) => x.id)).size, TUTORS.length);
+  assert.equal(new Set(SCENARIOS.map((x) => x.id)).size, SCENARIOS.length);
+  assert.equal(getTutor('inconnu').id, TUTORS[0].id); assert.equal(getScenario('zzz').id, 'free');
+  assert.ok(scenariosForLevel('A1').some((s) => s.id === 'cafe') && !scenariosForLevel('A1').some((s) => s.id === 'interview'));
+  assert.equal(scenariosForLevel('C1')[0].id, 'free');
+  for (const tu of TUTORS) assert.ok(tu.persona.length > 40 && tu.colors.skin);
+});
+test('conversationSystemPrompt : persona et scénario injectés, règles conservées', () => {
+  const sys = conversationSystemPrompt(P({ language: 'nl' }), { persona: 'Your name is Emma.', scenario: 'Role-play: waiter.' });
+  assert.match(sys, /CHARACTER — Your name is Emma/); assert.match(sys, /SCENARIO — Role-play: waiter/); assert.match(sys, /read aloud/);
+  assert.doesNotMatch(conversationSystemPrompt(P()), /CHARACTER|SCENARIO/);
+});
+test('normalizeSessionSummary : nettoie, borne, refuse le vide ; prompt sans score', () => {
+  assert.equal(normalizeSessionSummary(null), null); assert.equal(normalizeSessionSummary({}), null);
+  const s = normalizeSessionSummary({ summary: 'ok', strengths: ['a', 2, 'b', 'c', 'd'], errors: [{ wrong: 'x', right: 'y' }, { wrong: 'seul' }], vocab: [{ word: 'w', def: 'd' }, {}] });
+  assert.equal(s.strengths.length, 3); assert.equal(s.errors.length, 1); assert.equal(s.vocab.length, 1);
+  assert.match(sessionSummarySystemPrompt(P()), /Do not give scores/);
+});
+test('sessionStats / fmtDuration', () => {
+  assert.deepEqual(sessionStats({ durationSec: 75, messages: [{ role: 'user', content: 'a b c' }, { role: 'assistant', content: 'x y' }, { role: 'user', content: 'd' }] }), { turns: 2, words: 4, durationSec: 75 });
+  assert.equal(fmtDuration(75), '1:15'); assert.equal(fmtDuration(5), '0:05');
+});
+test('Sauvegarde : tuteur, scénario, durée et bilan d\'une conversation orale survivent à l\'export/import', async () => {
+  const { buildExport, parseBackup } = await import('../js/backup.js');
+  const { Store, createMemoryBackend, createMemoryKV } = await import('../js/storage.js');
+  const s = new Store({ backend: createMemoryBackend(), local: createMemoryKV(), session: createMemoryKV() });
+  await s.put('conversations', { id: 'c1', kind: 'voice', title: 't', createdAt: 1, updatedAt: 2, topic: 'daily', level: 'B1', accent: 'nl-NL', profile: 'teacher', tutorId: 'emma', scenarioId: 'cafe', durationSec: 42,
+    summary: { summary: 'ok', strengths: ['a'], errors: [], vocab: [] }, messages: [{ id: 'm', role: 'user', content: 'hoi', ts: 1 }] });
+  const back = await parseBackup(JSON.stringify(await buildExport(s)));
+  const c = back.data.conversations[0];
+  assert.equal(c.tutorId, 'emma'); assert.equal(c.scenarioId, 'cafe'); assert.equal(c.durationSec, 42); assert.equal(c.summary.summary, 'ok'); assert.equal(c.kind, 'voice');
 });

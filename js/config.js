@@ -8,7 +8,7 @@
  *   + son entrée dans PROVIDER_IDS.
  */
 
-export const APP_VERSION = '1.1.0';
+export const APP_VERSION = '1.2.0';
 export const BACKUP_FORMAT = 'linguacoach-backup';
 /** Version du format de sauvegarde. Incrémenter + ajouter une migration dans backup.js si le schéma change. */
 export const BACKUP_VERSION = 1;
