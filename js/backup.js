@@ -16,6 +16,7 @@
 import { BACKUP_FORMAT, BACKUP_VERSION, APP_VERSION, SKILLS } from './config.js';
 import { sanitizePrefs, COLLECTIONS } from './storage.js';
 import { stableStringify, sha256Hex, bytesToBase64, base64ToBytes } from './utils.js';
+import { normalizeSessionSummary } from './ai/prompts.js';
 
 export const MAX_BACKUP_BYTES = 50 * 1024 * 1024;
 const MAX_RECORDS = 100000;
@@ -75,6 +76,10 @@ const VALIDATORS = {
       level: isStr(r.level, 5) ? r.level : '', accent: isStr(r.accent, 20) ? r.accent : '',
       profile: isStr(r.profile, 50) ? r.profile : '', messages,
       ...(r.kind === 'voice' ? { kind: 'voice' } : {}),
+      ...(isStr(r.tutorId, 50) && r.tutorId ? { tutorId: r.tutorId } : {}),
+      ...(isStr(r.scenarioId, 50) && r.scenarioId ? { scenarioId: r.scenarioId } : {}),
+      ...(isNum(r.durationSec) ? { durationSec: r.durationSec } : {}),
+      ...(normalizeSessionSummary(r.summary) ? { summary: normalizeSessionSummary(r.summary) } : {}),
     };
   },
   activities(r, i) {

@@ -109,7 +109,7 @@ export function speakSequence(segments, { win = globalThis, lang, voice = null, 
  * sans couper ce qui est en cours (contrairement à speakSequence).
  * @returns {{enqueue(text), cancel(), whenIdle(): Promise<void>, speaking: () => boolean}}
  */
-export function createSpeechQueue({ win = globalThis, voice = null, lang, rate = 1, onStart, onIdle } = {}) {
+export function createSpeechQueue({ win = globalThis, voice = null, lang, rate = 1, pitch = 1, onStart, onIdle } = {}) {
   const synth = win.speechSynthesis;
   const q = [];
   let busy = false;
@@ -124,6 +124,7 @@ export function createSpeechQueue({ win = globalThis, voice = null, lang, rate =
     if (voice) u.voice = voice;
     u.lang = voice?.lang ?? lang;
     u.rate = rate;
+    if (pitch !== 1) u.pitch = pitch;
     u.onend = () => next(g);
     u.onerror = (e) => { if (e.error === 'canceled' || e.error === 'interrupted') return; next(g); };
     synth.speak(u);

@@ -143,9 +143,40 @@ fieldset { border: 1px solid var(--border); border-radius: 14px; margin: 10px 0;
 
 /* Conversation orale */
 .mic-btn { min-width: 9.5rem; }
-.mic-btn.is-listening { background: var(--danger, #b3261e); border-color: var(--danger, #b3261e); animation: lc-pulse 1.4s ease-in-out infinite; }
+.call .mic-btn.is-listening, .mic-btn.is-listening { background: var(--danger, #b3261e); border-color: var(--danger, #b3261e); animation: lc-pulse 1.4s ease-in-out infinite; }
 @keyframes lc-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(179, 38, 30, .45); } 50% { box-shadow: 0 0 0 10px rgba(179, 38, 30, 0); } }
 @media (prefers-reduced-motion: reduce) { .mic-btn.is-listening { animation: none; } }
 .conv-status { min-height: 1.4em; color: var(--muted); margin: .25rem 0; }
 .conv-opts { margin-top: 1rem; }
 .msg .tip { font-size: .9rem; color: var(--muted); }
+
+/* Appel vocal : tuteurs, écran plein écran, bilan */
+.tutor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; border: 0; padding: 0; margin: 0 0 1rem; }
+.tutor-choice input { position: absolute; opacity: 0; pointer-events: none; }
+.tutor-choice label { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px; border: 2px solid var(--border); border-radius: 16px; cursor: pointer; text-align: center; }
+.tutor-choice input:checked + label { border-color: var(--primary); background: var(--surface); }
+.tutor-choice input:focus-visible + label { outline: 3px solid var(--primary); outline-offset: 2px; }
+.call-btn { padding: .8rem 1.4rem; }
+.call { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; gap: .75rem; padding: calc(12px + env(safe-area-inset-top)) 16px calc(12px + env(safe-area-inset-bottom)); background: var(--bg); overflow-y: auto; }
+.call > * { width: 100%; max-width: 560px; }
+.call-top { display: flex; justify-content: space-between; align-items: flex-start; }
+.call-name { margin: 0; font-size: 1.4rem; }
+.call-timer { font-variant-numeric: tabular-nums; color: var(--muted); }
+.call-avatar { display: flex; justify-content: center; }
+.avatar { border-radius: 50%; position: relative; box-shadow: 0 0 0 4px transparent; transition: box-shadow .2s; }
+.avatar-svg { display: block; }
+.call.is-listening .avatar { box-shadow: 0 0 0 6px var(--primary); }
+.call.is-speaking .avatar-mouth { animation: lc-talk .28s ease-in-out infinite alternate; transform-origin: 50px 58px; }
+.call.is-thinking .avatar-eyes { animation: lc-blink 1.2s steps(1) infinite; transform-origin: 50px 47px; }
+@keyframes lc-talk { from { transform: scaleY(1); } to { transform: scaleY(3.2); } }
+@keyframes lc-blink { 0%, 90% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
+@media (prefers-reduced-motion: reduce) { .call.is-speaking .avatar-mouth, .call.is-thinking .avatar-eyes { animation: none; } .call.is-speaking .avatar { box-shadow: 0 0 0 6px var(--border); } }
+.call .conv-status { text-align: center; }
+.call-subtitles { flex: 1; min-height: 4.5rem; text-align: center; }
+.subtitle { font-size: 1.15rem; line-height: 1.5; }
+.call-controls { display: flex; align-items: center; justify-content: center; gap: 16px; }
+.call .mic-btn { width: 96px; height: 96px; border-radius: 50%; min-width: 0; border: 0; background: var(--primary); color: var(--primary-ink); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: .8rem; cursor: pointer; }
+.call .mic-btn:disabled { opacity: .5; cursor: not-allowed; }
+.call .mic-btn:focus-visible { outline: 3px solid var(--text); outline-offset: 3px; }
+.call-more { margin-top: .25rem; }
+.summary-head { display: flex; align-items: center; gap: 12px; }

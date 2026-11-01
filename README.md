@@ -1,6 +1,6 @@
 # LinguaCoach
 
-PWA de coaching linguistique (**anglais** et **néerlandais**, NL/BE) avec des agents IA : **écriture**, **écoute**, **expression orale** et **conversation orale** (v1.1).
+PWA de coaching linguistique (**anglais** et **néerlandais**, NL/BE) avec des agents IA : **écriture**, **écoute**, **expression orale** et **appel vocal avec tuteur IA** (v1.1–1.2).
 HTML / CSS / JavaScript modernes (modules ES), **sans framework, sans étape de build**, déployable sur n'importe quel hébergement statique HTTPS.
 
 > **Statut honnête** : le code, les tests automatisés et les vérifications dans Chromium sont réels (voir « Tests »).
@@ -105,13 +105,14 @@ Il suffirait d'ajouter un adaptateur `custom` pointant vers ce backend (même pr
 - Sans `SpeechRecognition` (Firefox…), l'enregistrement MediaRecorder permet de se réécouter et de comparer à l'oreille.
 - Analyse audio par IA : conversion en WAV 16 kHz mono, envoi uniquement à un fournisseur déclarant `audioInput` (Gemini ici), après consentement.
 
-### Conversation orale (onglet « Parler », v1.1)
+### Appel vocal avec un tuteur (onglet « Parler », v1.2)
 
-- Vous parlez (reconnaissance vocale du navigateur, dans la langue/variante choisie), l'IA répond en streaming et sa réponse est **lue à voix haute phrase par phrase** dès qu'elle arrive. Option mains libres (réécoute automatique après la réponse), envoi automatique, affichage du texte facultatif, saisie clavier de repli.
-- L'IA reçoit **uniquement la transcription** (texte) : elle ne juge pas votre prononciation. Aucun audio n'est conservé. Le consentement avant envoi s'applique comme ailleurs.
-- La consigne demande des réponses courtes sans markdown, des corrections implicites et un conseil facultatif `[TIP]` (affiché, jamais lu).
-- Les conversations orales sont enregistrées localement (`kind: 'voice'`), exportées dans la sauvegarde, et séparées de celles de l'écriture.
-- La reconnaissance est coupée pendant que l'IA parle (évite l'écho) ; avec haut-parleurs, un casque reste préférable.
+- **Tuteurs-personnages** (4, créations originales avec avatars SVG génériques) : personnalité transmise à l'IA ; la hauteur de voix varie légèrement, mais la voix réelle dépend de l'appareil.
+- **Scénarios de jeu de rôle** adaptés au niveau (café, itinéraire, hôtel, entretien, réunion, médecin, débat, loisirs) ou conversation libre.
+- **Écran d'appel plein écran** : avatar (la bouche s'anime pendant que l'IA parle, **sans synchronisation sur les phonèmes**), sous-titres facultatifs, gros bouton micro, durée, « Raccrocher ». Options : envoi automatique, mains libres, saisie clavier.
+- Vous parlez (reconnaissance vocale du navigateur, langue/variante choisies), l'IA répond en streaming et sa réponse est **lue à voix haute phrase par phrase**. Le micro est coupé pendant que l'IA parle (écho) ; un casque reste préférable.
+- **Bilan de fin de session** : statistiques locales immédiates (durée, prises de parole, mots transcrits) ; bilan IA à la demande (points forts, erreurs, vocabulaire), à partir de la transcription seule, avec ajout en un clic à **Révision**.
+- L'IA ne reçoit que la **transcription** : elle ne juge pas la prononciation. Aucun audio n'est conservé ; consentement avant envoi comme ailleurs. Les sessions sont enregistrées localement (`kind: 'voice'`, avec tuteur, scénario, durée, bilan), exportées dans la sauvegarde et séparées des conversations d'écriture.
 
 ### Néerlandais
 
@@ -134,9 +135,9 @@ Réglages › Données : export JSON (préférences non sensibles, conversations
 ## 8. Tests
 
 ```bash
-npm test                                   # 106 tests unitaires/intégration (node:test, aucun réseau)
+npm test                                   # 111 tests unitaires/intégration (node:test, aucun réseau)
 python3 -m http.server 8080 &              # puis, avec Playwright installé :
-node tests/e2e/smoke.mjs                   # 59 vérifications dans Chromium (API IA simulées via page.route)
+node tests/e2e/smoke.mjs                   # 66 vérifications dans Chromium (API IA simulées via page.route)
 npm i axe-core && node tests/e2e/a11y.mjs node_modules/axe-core/axe.min.js   # audit axe-core, 14 vues (7 écrans × clair/sombre)
 ```
 
@@ -174,5 +175,5 @@ Des bugs réels trouvés et corrigés grâce à ces tests : lecture de flux muet
 - Appels directs depuis le navigateur : dépendent du CORS du fournisseur (OpenAI, Gemini et Anthropic l'autorisent à ce jour avec les en-têtes utilisés ; un fournisseur personnalisé doit l'autoriser).
 - Le stockage du navigateur peut être purgé (surtout iOS) : exportez régulièrement ; un bouton demande le stockage persistant.
 - Interface en anglais : partielle (repli sur le français). Contenu local : 40 exercices par langue (25 phrases, 5 dialogues, 10 mini-histoires) ; contenu néerlandais écrit sans relecture par un natif ; l'IA peut en générer d'autres.
-- Conversation orale : testée uniquement avec une fausse reconnaissance/synthèse et une IA simulée dans Chromium ; qualité réelle de la reconnaissance du néerlandais, latence et écho non vérifiés.
+- Appel vocal : testé uniquement avec une fausse reconnaissance/synthèse et une IA simulée dans Chromium ; qualité réelle de la reconnaissance du néerlandais, latence, écho et rendu visuel de l'avatar sur mobile non vérifiés. L'audit axe couvre l'écran de préparation, pas l'écran d'appel en cours.
 - Pas de tests de charge, de revue de sécurité externe ni d'audit manuel d'accessibilité.
