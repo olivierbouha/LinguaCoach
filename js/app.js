@@ -21,9 +21,10 @@ import * as conversation from './modules/conversation.js';
 import * as settings from './modules/settings.js';
 import * as review from './modules/review.js';
 import * as study from './modules/study.js';
+import * as welcome from './modules/welcome.js';
 import './install.js';
 
-const ROUTES = { home, writing, listening, speaking, conversation, settings, review, study };
+const ROUTES = { home, writing, listening, speaking, conversation, settings, review, study, welcome };
 const NAV = [
   ['home', 'nav.home', 'home'],
   ['writing', 'nav.writing', 'write'],
@@ -58,7 +59,10 @@ function buildContext() {
     async voicePick() {
       if (!voicesCache?.length) voicesCache = await loadVoices(globalThis, 3000); // ne jamais mémoriser une liste vide (Android : voix chargées tardivement)
       const p = store.getPrefs();
-      return pickVoice(voicesCache, p.accent, { preferredURI: p.voiceURI });
+      const pick = pickVoice(voicesCache, p.accent, { preferredURI: p.voiceURI });
+      // Certains Android n'énumèrent aucune voix alors que la synthèse fonctionne avec la seule langue : lecture « non vérifiée ».
+      if (!pick.voice && !voicesCache.length && speechSupport().synthesis) return { ...pick, unverified: true };
+      return pick;
     },
     async allVoices() { if (!voicesCache?.length) voicesCache = await loadVoices(globalThis, 3000); return voicesCache; },
 

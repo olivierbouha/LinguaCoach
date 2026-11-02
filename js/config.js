@@ -8,7 +8,7 @@
  *   + son entrée dans PROVIDER_IDS.
  */
 
-export const APP_VERSION = '1.3.0';
+export const APP_VERSION = '1.4.0';
 export const BACKUP_FORMAT = 'linguacoach-backup';
 /** Version du format de sauvegarde. Incrémenter + ajouter une migration dans backup.js si le schéma change. */
 export const BACKUP_VERSION = 1;
@@ -140,6 +140,7 @@ export const DEFAULT_PREFS = Object.freeze({
   speechRate: 1,
   voiceURI: '',
   keyStorage: 'local', // 'local' (localStorage) ou 'session' (effacée à la fermeture de l'onglet)
+  onboarded: false, // assistant de premier lancement terminé ou passé
   backupReminderDays: 7,
   lastBackupAt: 0,
   aiConsent: {}, // { [providerId]: true } — consentement explicite à l'envoi de texte au fournisseur

@@ -177,6 +177,7 @@ export function sanitizePrefs(raw) {
     speechRate: num(r.speechRate, 0.5, 1.5, d.speechRate),
     voiceURI: str(r.voiceURI, 300),
     keyStorage: oneOf(r.keyStorage, ['local', 'session'], d.keyStorage),
+    onboarded: r.onboarded === true,
     backupReminderDays: Math.round(num(r.backupReminderDays, 0, 365, d.backupReminderDays)),
     lastBackupAt: num(r.lastBackupAt, 0, 8.64e15, 0),
     aiConsent: consent,

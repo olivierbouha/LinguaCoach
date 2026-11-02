@@ -187,3 +187,10 @@ fieldset { border: 1px solid var(--border); border-radius: 14px; margin: 10px 0;
 .verb-table { border-collapse: collapse; width: 100%; font-size: .92rem; }
 .verb-table caption { text-align: left; color: var(--muted); padding-bottom: .4rem; }
 .verb-table th, .verb-table td { border-bottom: 1px solid var(--border); padding: .4rem .5rem; text-align: left; white-space: nowrap; }
+
+/* Plan du jour */
+.plan { list-style: none; padding: 0; margin: .5rem 0 0; display: grid; gap: .4rem; }
+.plan li { display: flex; align-items: center; gap: .6rem; }
+.plan-mark { width: 1.4rem; text-align: center; color: var(--muted); }
+.plan-done .plan-mark { color: var(--ok); font-weight: 700; }
+.plan-done a { text-decoration: line-through; color: var(--muted); }

@@ -11,7 +11,7 @@
  *
  * Pour publier une nouvelle version : modifier VERSION (et la liste si des fichiers changent).
  */
-const VERSION = '1.3.0';
+const VERSION = '1.4.0';
 const CACHE = `linguacoach-${VERSION}`;
 const PRECACHE = [
   './',
@@ -41,6 +41,7 @@ const PRECACHE = [
   'js/tutors.js',
   'js/content/verbs.js',
   'js/modules/study.js',
+  'js/modules/welcome.js',
   'js/avatar.js',
   'js/modules/conversation.js',
   'js/content/index.js',

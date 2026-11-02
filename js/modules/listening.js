@@ -56,19 +56,19 @@ export async function render(root, ctx) {
 
   /* ---------- lecture audio ---------- */
   async function play() {
-    if (!pick.voice) { toast(t('speech.noVoice'), { kind: 'warn' }); return; }
+    if (!pick.voice && !pick.unverified) { toast(t('speech.noVoice'), { kind: 'warn' }); return; }
     stop();
     let segments;
-    if (exercise.type === 'dialogue') {
+    if (exercise.type === 'dialogue' && pick.voice) {
       const voices = await ctx.allVoices();
       const sameLang = voices.filter((v) => v.lang.toLowerCase().startsWith(pick.voice.lang.slice(0, 2).toLowerCase()) && v.voiceURI !== pick.voice.voiceURI);
       const voiceB = sameLang.find((v) => v.lang.replace('_', '-').toLowerCase() === pick.voice.lang.replace('_', '-').toLowerCase()) ?? sameLang[0] ?? null;
       segments = exercise.lines.map((l, i) => ({ text: l.text, lineIndex: i, voice: l.speaker === 'B' ? voiceB ?? pick.voice : pick.voice, pitch: l.speaker === 'B' && !voiceB ? 0.8 : 1 }));
     } else {
-      segments = [{ text: exercise.text }];
+      segments = exercise.type === 'dialogue' ? exercise.lines.map((l, i) => ({ text: l.text, lineIndex: i })) : [{ text: exercise.text }];
     }
     playing = speakSequence(segments, {
-      voice: pick.voice, lang: pick.voice.lang, rate,
+      voice: pick.voice, lang: pick.voice?.lang ?? pick.requested, rate,
       onSegment: (seg) => { if (seg.lineIndex != null && seg.lineIndex !== currentLine) { currentLine = seg.lineIndex; if (showTranscript) draw(); } },
     });
     draw();
@@ -162,13 +162,13 @@ export async function render(root, ctx) {
       h('div', { class: 'btn-row' },
         playing
           ? h('button', { class: 'btn btn-primary', type: 'button', onclick: () => { stop(); draw(); } }, icon('stop', 18), ' ', t('listening.stop'))
-          : h('button', { class: 'btn btn-primary', type: 'button', disabled: !pick.voice, onclick: play }, icon('play', 18), ' ', t('listening.play')),
-        h('button', { class: 'btn', type: 'button', disabled: !pick.voice, onclick: play }, icon('refresh', 18), ' ', t('listening.replay')),
+          : h('button', { class: 'btn btn-primary', type: 'button', disabled: !(pick.voice || pick.unverified), onclick: play }, icon('play', 18), ' ', t('listening.play')),
+        h('button', { class: 'btn', type: 'button', disabled: !(pick.voice || pick.unverified), onclick: play }, icon('refresh', 18), ' ', t('listening.replay')),
         h('div', { class: 'field inline' }, h('label', { for: 'l-rate' }, t('listening.speed')),
           select(RATES.map((r) => [String(r), `${r}×`]), String(rate), (x) => { rate = Number(x); ctx.setPrefs({ speechRate: rate }); if (playing) play(); }, { id: 'l-rate' }))),
       h('button', { class: 'btn btn-small', type: 'button', 'aria-expanded': String(showTranscript), onclick: () => { showTranscript = !showTranscript; draw(); } }, showTranscript ? t('listening.hide') : t('listening.show')),
       showTranscript ? transcriptEl() : null,
-      !pick.voice ? banner('warn', t('listening.noVoiceReadText')) : null,
+      !(pick.voice || pick.unverified) ? banner('warn', t('listening.noVoiceReadText')) : null,
       exercise.type === 'phrase' && dictation
         ? h('div', { class: 'dictation' },
           h('label', { for: 'l-dict' }, t('listening.dictLabel')),

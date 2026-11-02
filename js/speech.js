@@ -57,6 +57,7 @@ export function voicesForLanguage(voices, requested) {
 
 /** Texte d'état honnête sur la voix réellement utilisée. */
 export function describeVoice(pick) {
+  if (pick?.unverified) return { level: 'warn', text: `Votre navigateur ne liste aucune voix. La lecture est tentée avec la langue « ${pick.requested} » seule : la voix et l'accent entendus ne sont pas vérifiables.` };
   if (!pick || pick.quality === 'none') {
     return { level: 'warn', text: `Aucune voix « ${pick?.requested ?? ''} » ni de la même langue n'est disponible sur cet appareil : la lecture audio n'est pas possible (le texte reste utilisable).` };
   }

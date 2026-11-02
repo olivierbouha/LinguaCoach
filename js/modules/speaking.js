@@ -61,9 +61,9 @@ export async function render(root, ctx) {
   }
 
   function listenModel(slow) {
-    if (!pick.voice) { toast(t('speech.noVoice'), { kind: 'warn' }); return; }
+    if (!pick.voice && !pick.unverified) { toast(t('speech.noVoice'), { kind: 'warn' }); return; }
     playing?.cancel();
-    playing = speakSequence([{ text: sentence.text }], { voice: pick.voice, lang: pick.voice.lang, rate: slow ? 0.65 : ctx.prefs().speechRate });
+    playing = speakSequence([{ text: sentence.text }], { voice: pick.voice, lang: pick.voice?.lang ?? pick.requested, rate: slow ? 0.65 : ctx.prefs().speechRate });
     playing.done.then(() => { playing = null; });
   }
 
@@ -224,8 +224,8 @@ export async function render(root, ctx) {
         h('p', { class: 'big-text', lang: L }, sentence.text),
         h('p', { class: 'muted' }, `${t('common.level')} ${sentence.level}`),
         h('div', { class: 'btn-row' },
-          h('button', { class: 'btn', type: 'button', disabled: !pick.voice, onclick: () => listenModel(false) }, icon('play', 18), ' ', t('speaking.listen')),
-          h('button', { class: 'btn', type: 'button', disabled: !pick.voice, onclick: () => listenModel(true) }, t('speaking.listenSlow')),
+          h('button', { class: 'btn', type: 'button', disabled: !(pick.voice || pick.unverified), onclick: () => listenModel(false) }, icon('play', 18), ' ', t('speaking.listen')),
+          h('button', { class: 'btn', type: 'button', disabled: !(pick.voice || pick.unverified), onclick: () => listenModel(true) }, t('speaking.listenSlow')),
           h('button', { class: 'btn', type: 'button', onclick: () => { nextSentence(); draw(); } }, t('speaking.next'))),
         sup.recognition && sup.recorder && audioCapable
           ? h('div', { class: 'field field-check' }, h('input', { id: 's-audio', type: 'checkbox', checked: wantAudio, disabled: state !== 'idle', onchange: (e) => { wantAudio = e.target.checked; } }), h('label', { for: 's-audio' }, t('speaking.wantAudio')))
