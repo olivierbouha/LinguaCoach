@@ -98,6 +98,11 @@ const VALIDATORS = {
   },
   vocab: card('vocab'),
   errors: card('errors'),
+  lists(r, i) {
+    if (!isStr(r.id, 100) || !r.id) fail('lists', i, 'identifiant manquant');
+    if (!isStr(r.name, 200) || !r.name.trim()) fail('lists', i, 'nom de liste invalide');
+    return { id: r.id, name: r.name.trim(), createdAt: isNum(r.createdAt) ? r.createdAt : 0, updatedAt: isNum(r.updatedAt) ? r.updatedAt : 0 };
+  },
 };
 
 function card(coll) {
@@ -109,6 +114,7 @@ function card(coll) {
       id: r.id, kind: isStr(r.kind, 30) ? r.kind : coll, front: r.front, back: r.back, source: isStr(r.source, 200) ? r.source : '',
       createdAt: isNum(r.createdAt) ? r.createdAt : 0, updatedAt: isNum(r.updatedAt) ? r.updatedAt : 0,
       due: r.due, interval: r.interval, ease: r.ease, reps: r.reps, lapses: isNum(r.lapses) ? r.lapses : 0,
+      ...(Array.isArray(r.lists) ? { lists: [...new Set(r.lists.filter((x) => isStr(x, 100) && x))].slice(0, 200) } : {}),
     };
   };
 }

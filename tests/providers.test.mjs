@@ -198,3 +198,21 @@ test('Capacités déclarées', () => {
   assert.equal(openai.capabilities.audioInput, false);
   assert.equal(anthropic.capabilities.audioInput, false);
 });
+
+test('Images : corps de requête par fournisseur (Gemini inlineData, OpenAI image_url, Anthropic bloc image avant le texte) sur le DERNIER message user', async () => {
+  const img = { mimeType: 'image/jpeg', base64: 'QUJD' };
+  const req = { system: 'S', messages: [{ role: 'user', content: 'old' }, { role: 'assistant', content: 'a' }, { role: 'user', content: 'read it' }], images: [img] };
+  const fg = fakeFetch(() => geminiOk('x')); await gemini.complete({ apiKey: KEY_A, model: 'g' }, req, { fetch: fg, timeoutMs: 500 });
+  const gParts = fg.calls[0].body.contents.at(-1).parts;
+  assert.deepEqual(gParts[1], { inlineData: { mimeType: 'image/jpeg', data: 'QUJD' } }); assert.equal(fg.calls[0].body.contents[0].parts.length, 1);
+  const fo = fakeFetch(() => openaiOk('x')); await openai.complete({ apiKey: KEY_B, model: 'o' }, req, { fetch: fo, timeoutMs: 500 });
+  const oLast = fo.calls[0].body.messages.at(-1).content;
+  assert.equal(oLast[0].text, 'read it'); assert.equal(oLast[1].image_url.url, 'data:image/jpeg;base64,QUJD'); assert.equal(typeof fo.calls[0].body.messages[1].content, 'string');
+  const fa = fakeFetch(() => anthropicOk('x')); await anthropic.complete({ apiKey: KEY_C, model: 'c' }, req, { fetch: fa, timeoutMs: 500 });
+  const aLast = fa.calls[0].body.messages.at(-1).content;
+  assert.equal(aLast[0].type, 'image'); assert.equal(aLast[0].source.data, 'QUJD'); assert.equal(aLast[0].source.media_type, 'image/jpeg'); assert.equal(aLast.at(-1).text, 'read it');
+  // sans images : corps inchangés
+  const fo2 = fakeFetch(() => openaiOk('x')); await openai.complete({ apiKey: KEY_B, model: 'o' }, { system: 'S', messages: [{ role: 'user', content: 'hi' }] }, { fetch: fo2, timeoutMs: 500 });
+  assert.equal(fo2.calls[0].body.messages.at(-1).content, 'hi');
+  assert.deepEqual([gemini, openai, anthropic, custom].map((p) => p.capabilities.imageInput), [true, true, true, false]);
+});

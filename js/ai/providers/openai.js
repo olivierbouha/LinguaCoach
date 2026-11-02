@@ -24,7 +24,14 @@ function refine(status, json) {
 }
 
 export function buildBody(req, cfg, { tokenParam, supportsJsonMode, stream }) {
-  const messages = [...(req.system ? [{ role: 'system', content: req.system }] : []), ...req.messages.map((m) => ({ role: m.role, content: m.content }))];
+  const last = req.messages.length - 1;
+  const messages = [...(req.system ? [{ role: 'system', content: req.system }] : []), ...req.messages.map((m, i) => ({
+    role: m.role,
+    // Images (modèles « vision ») : jointes au DERNIER message utilisateur, en URL de données.
+    content: req.images?.length && i === last && m.role === 'user'
+      ? [{ type: 'text', text: m.content }, ...req.images.map((img) => ({ type: 'image_url', image_url: { url: `data:${img.mimeType};base64,${img.base64}` } }))]
+      : m.content,
+  }))];
   return {
     model: cfg.model,
     messages,
@@ -35,10 +42,10 @@ export function buildBody(req, cfg, { tokenParam, supportsJsonMode, stream }) {
   };
 }
 
-export function createOpenAICompatible({ id, label, defaultBaseUrl, requiresKey, requiresBaseUrl, tokenParam, supportsJsonMode }) {
+export function createOpenAICompatible({ id, label, defaultBaseUrl, requiresKey, requiresBaseUrl, tokenParam, supportsJsonMode, imageInput = false }) {
   return {
     id, label, defaultBaseUrl, requiresKey, requiresBaseUrl,
-    capabilities: { streaming: true, audioInput: false, jsonMode: supportsJsonMode, listModels: true },
+    capabilities: { streaming: true, audioInput: false, imageInput, jsonMode: supportsJsonMode, listModels: true },
 
     async complete(cfg, req, ctx) {
       const secrets = [cfg.apiKey];
@@ -108,5 +115,5 @@ export function createOpenAICompatible({ id, label, defaultBaseUrl, requiresKey,
 
 export const openai = createOpenAICompatible({
   id: 'openai', label: 'OpenAI', defaultBaseUrl: 'https://api.openai.com/v1',
-  requiresKey: true, requiresBaseUrl: false, tokenParam: 'max_completion_tokens', supportsJsonMode: true,
+  requiresKey: true, requiresBaseUrl: false, tokenParam: 'max_completion_tokens', supportsJsonMode: true, imageInput: true,
 });

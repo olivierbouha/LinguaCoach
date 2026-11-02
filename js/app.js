@@ -22,9 +22,10 @@ import * as settings from './modules/settings.js';
 import * as review from './modules/review.js';
 import * as study from './modules/study.js';
 import * as welcome from './modules/welcome.js';
+import * as lists from './modules/lists.js';
 import './install.js';
 
-const ROUTES = { home, writing, listening, speaking, conversation, settings, review, study, welcome };
+const ROUTES = { home, writing, listening, speaking, conversation, settings, review, study, welcome, lists };
 const NAV = [
   ['home', 'nav.home', 'home'],
   ['writing', 'nav.writing', 'write'],
@@ -80,7 +81,7 @@ function buildContext() {
      */
     async askAI(req, opts = {}) {
       if (!ai.isConfigured()) throw new AIError('config', friendlyMessage('config'), { code: 'not_configured' });
-      const ok = await ensureConsent(req.audio ? { audio: req.audio } : {});
+      const ok = await ensureConsent({ ...(req.audio ? { audio: req.audio } : {}), ...(req.images?.length ? { images: req.images } : {}) });
       if (!ok) throw new AIError('canceled', t('ai.consentDeclined'));
       return ai.ask(req, {
         ...opts,
@@ -92,10 +93,21 @@ function buildContext() {
 }
 
 /** Consentement avant tout envoi de contenu à un fournisseur. */
-async function ensureConsent({ audio } = {}) {
+async function ensureConsent({ audio, images } = {}) {
   const p = store.getPrefs();
   const targets = [ai.resolve('primary'), ai.hasFallback() ? ai.resolve('fallback') : null].filter(Boolean)
-    .filter((r) => !audio || r.provider.capabilities.audioInput);
+    .filter((r) => !audio || r.provider.capabilities.audioInput)
+    .filter((r) => !images || r.provider.capabilities.imageInput);
+  if (images) {
+    // Photos : consentement détaillé à CHAQUE envoi (comme l'audio) ; une photo peut contenir des données personnelles.
+    const names = [...new Set(targets.map((r) => r.provider.label))].join(', ');
+    return confirmDialog({
+      title: t('consent.imageTitle'),
+      message: t('consent.imageMsg', { providers: names, n: images.length }),
+      details: [t('consent.imageD1', { kb: Math.round(images.reduce((n, im) => n + (im.base64.length * 3) / 4, 0) / 1024) }), t('consent.imageD2'), t('consent.imageD3')],
+      confirmLabel: t('consent.imageOk'),
+    });
+  }
   if (audio) {
     const names = [...new Set(targets.map((r) => r.provider.label))].join(', ');
     return confirmDialog({

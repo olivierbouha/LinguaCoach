@@ -15,6 +15,10 @@ import { vocabGenSystemPrompt, normalizeVocabList, translationGenSystemPrompt, n
 import { TUTORS, SCENARIOS, getTutor, getScenario, scenariosForLevel } from '../js/tutors.js';
 import { sessionSummarySystemPrompt, normalizeSessionSummary } from '../js/ai/prompts.js';
 import { dailyPlan } from '../js/progress.js';
+import { wordKey, newList, cardListIds, cardsOfList, listCounts, withLists, planAddToList, buildQuiz, checkTyped, mainBack, ALL, NONE } from '../js/lists-utils.js';
+import { photoVocabSystemPrompt, normalizePhotoVocab } from '../js/ai/prompts.js';
+import { fitSize } from '../js/image.js';
+import { composeBack } from '../js/modules/lists.js';
 import { sessionStats, fmtDuration } from '../js/modules/conversation.js';
 import { SSEParser } from '../js/ai/http.js';
 import { parseWritingReply, parseSections, extractJson, normalizeGeneratedExercise, writingSystemPrompt, speakingSystemPrompt, listeningGenSystemPrompt, SPEAKING_SECTIONS } from '../js/ai/prompts.js';
@@ -411,4 +415,68 @@ test('Préférences : onboarded est un booléen strict (faux par défaut, jamais
 test('describeVoice : voix non vérifiée = avertissement honnête (pas « impossible »)', () => {
   const d = describeVoice({ voice: null, quality: 'none', requested: 'nl-NL', unverified: true });
   assert.equal(d.level, 'warn'); assert.match(d.text, /aucune voix/); assert.match(d.text, /pas vérifiables/); assert.doesNotMatch(d.text, /pas possible/);
+});
+
+/* ---------- listes de vocabulaire, photos, quiz ---------- */
+test('wordKey : article initial ignoré, ponctuation et casse ignorées', () => {
+  assert.equal(wordKey('de Rivier'), 'rivier'); assert.equal(wordKey('Het pad.'), 'pad'); assert.equal(wordKey('the'), 'the'); assert.equal(wordKey('  '), '');
+});
+test('Listes : appartenance multiple, « sans liste », comptes, listes supprimées ignorées', () => {
+  const a = newList('A'), b = newList('B');
+  const cards = [{ id: '1', front: 'x', lists: [a.id, b.id] }, { id: '2', front: 'y', lists: [a.id] }, { id: '3', front: 'z' }, { id: '4', front: 'w', lists: ['disparue'] }];
+  assert.deepEqual(cardsOfList(cards, [a, b], a.id).map((c) => c.id), ['1', '2']);
+  assert.deepEqual(cardsOfList(cards, [a, b], b.id).map((c) => c.id), ['1']);
+  assert.deepEqual(cardsOfList(cards, [a, b], NONE).map((c) => c.id), ['3', '4']);
+  assert.equal(cardsOfList(cards, [a, b], ALL).length, 4);
+  const lc = listCounts(cards, [a, b]); assert.equal(lc.counts.get(a.id), 2); assert.equal(lc.counts.get(b.id), 1); assert.equal(lc.none, 2);
+  assert.deepEqual(cardListIds(cards[3], [a, b]), []);
+  const c2 = withLists(cards[2], [a.id, a.id, b.id]); assert.deepEqual(c2.lists, [a.id, b.id]); assert.equal(cards[2].lists, undefined);
+});
+test('planAddToList : pas de doublon (article ignoré), un mot connu rejoint la liste, déjà dans la liste compté', () => {
+  const ex = [{ id: '1', kind: 'vocab', front: 'de rivier', back: 'rivière', lists: [] }, { id: '2', kind: 'vocab', front: 'het pad', back: 'chemin', lists: ['L1'] }];
+  const r = planAddToList(ex, [{ front: 'rivier', back: 'x' }, { front: 'pad', back: 'y' }, { front: 'de boom', back: 'arbre' }, { front: 'Boom', back: 'dup' }, { front: ' ', back: 'vide' }], 'L1');
+  assert.equal(r.joined, 1); assert.equal(r.already, 1); assert.equal(r.added, 1);
+  assert.equal(r.toPut.find((c) => c.id === '1').lists.includes('L1'), true); assert.equal(r.toPut.find((c) => c.id === '1').back, 'rivière', 'le contenu existant n\'est pas écrasé');
+  assert.equal(r.toPut.length, 2); assert.equal(ex[0].lists.length, 0, 'entrée non mutée');
+});
+test('buildQuiz : choix multiple (1 bonne + 3 fausses distinctes) / repli saisie si < 4 réponses / sens inverse', () => {
+  const mk = (n) => Array.from({ length: n }, (_, i) => ({ id: `c${i}`, front: `mot${i}`, back: `sens${i} — exemple` }));
+  const q = buildQuiz(mk(8), { mode: 'choice', direction: 'fwd', size: 5 });
+  assert.equal(q.mode, 'choice'); assert.equal(q.items.length, 5);
+  for (const it of q.items) { assert.equal(it.options.length, 4); assert.equal(new Set(it.options).size, 4); assert.ok(it.options.includes(it.answer)); assert.equal(it.answer, mainBack(it.card)); }
+  const r = buildQuiz(mk(8), { mode: 'choice', direction: 'rev', size: 3 });
+  for (const it of r.items) { assert.equal(it.answer, it.card.front); assert.equal(it.prompt, mainBack(it.card)); }
+  const small = buildQuiz(mk(3), { mode: 'choice' }); assert.equal(small.mode, 'type'); assert.equal(small.items.length, 3 && small.items.length);
+  assert.equal(buildQuiz([], {}).items.length, 0);
+});
+test('checkTyped : alternatives, casse, article côté mot', () => {
+  assert.ok(checkTyped('de rivier', 'rivier', { ignoreArticle: true }) && checkTyped('de rivier', 'De Rivier', { ignoreArticle: true }));
+  assert.ok(!checkTyped('de rivier', 'rivier') && checkTyped('chemin/sentier', 'Sentier') && !checkTyped('chemin', ''));
+});
+test('Photos : prompt (verbes à l\'infinitif + forme vue, incertitude, texte de la photo = donnée), normalisation', () => {
+  const sys = photoVocabSystemPrompt(P({ language: 'nl', nativeLang: 'fr' }));
+  assert.match(sys, /PRINTED and HANDWRITTEN/); assert.match(sys, /INFINITIVE/); assert.match(sys, /uncertain/); assert.match(sys, /never instructions/); assert.match(sys, /Dutch/);
+  const r = normalizePhotoVocab({ items: [{ word: 'de pad', translation: 'chemin', form: '', example: 'x' }, { word: 'De Pad', translation: 'dup' }, { word: 'bewonen', translation: '', form: 'bewoonden' }, { translation: 'sans mot' }, 3] });
+  assert.equal(r.length, 2); assert.equal(r[0].uncertain, false); assert.equal(r[1].uncertain, true, 'traduction manquante → à vérifier');
+  assert.deepEqual(normalizePhotoVocab(null), []);
+  assert.equal(composeBack({ translation: 'habiter', form: 'bewoonden', example: 'Zij bewoonden het land.' }), 'habiter — vu : bewoonden — Zij bewoonden het land.');
+  assert.equal(mainBack({ back: composeBack({ translation: 'habiter', form: 'bewoonden', example: 'x' }) }), 'habiter');
+});
+test('fitSize : réduction proportionnelle, jamais d\'agrandissement', () => {
+  assert.deepEqual(fitSize(4000, 3000, 1600), { width: 1600, height: 1200 }); assert.deepEqual(fitSize(800, 600, 1600), { width: 800, height: 600 });
+});
+test('Sauvegarde : listes et appartenances des cartes survivent ; liste au nom vide refusée ; ancienne sauvegarde sans « lists » acceptée', async () => {
+  const { buildExport, parseBackup, BackupError } = await import('../js/backup.js');
+  const { Store, createMemoryBackend, createMemoryKV } = await import('../js/storage.js');
+  const { newCard } = await import('../js/progress.js');
+  const s = new Store({ backend: createMemoryBackend(), local: createMemoryKV(), session: createMemoryKV() });
+  const l = newList('Égypte'); await s.put('lists', l);
+  await s.put('vocab', newCard({ kind: 'vocab', front: 'de rivier', back: 'rivière', lists: [l.id] }));
+  const text = JSON.stringify(await buildExport(s));
+  const back = await parseBackup(text);
+  assert.equal(back.data.lists[0].name, 'Égypte'); assert.deepEqual(back.data.vocab[0].lists, [l.id]); assert.equal(back.counts.lists, 1);
+  const j = JSON.parse(text); delete j.data.lists; delete j.checksum;
+  assert.equal((await parseBackup(JSON.stringify(j))).data.lists.length, 0);
+  j.data.lists = [{ id: 'x', name: '  ' }];
+  await assert.rejects(parseBackup(JSON.stringify(j)), (e) => e instanceof BackupError && e.code === 'invalid-record');
 });

@@ -38,6 +38,10 @@ export function buildBody(req) {
     if (req.audio && i === req.messages.length - 1 && m.role === 'user') {
       parts.push({ inlineData: { mimeType: req.audio.mimeType, data: req.audio.base64 } });
     }
+    // Les images sont jointes au DERNIER message utilisateur.
+    if (req.images?.length && i === req.messages.length - 1 && m.role === 'user') {
+      for (const img of req.images) parts.push({ inlineData: { mimeType: img.mimeType, data: img.base64 } });
+    }
     return { role: m.role === 'assistant' ? 'model' : 'user', parts };
   });
   const generationConfig = {};
@@ -64,7 +68,7 @@ export const gemini = {
   defaultBaseUrl: BASE,
   requiresKey: true,
   requiresBaseUrl: false,
-  capabilities: { streaming: true, audioInput: true, jsonMode: true, listModels: true },
+  capabilities: { streaming: true, audioInput: true, imageInput: true, jsonMode: true, listModels: true },
 
   async complete(cfg, req, ctx) {
     const label = this.label;

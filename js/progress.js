@@ -103,8 +103,8 @@ export function dailyPlan(activities, { dueCount = 0, cardCount = 0, now = Date.
 
 export const GRADES = { again: 0, hard: 1, good: 2, easy: 3 };
 
-export function newCard({ kind, front, back, source = '' }, now = Date.now()) {
-  return { id: uid(), kind, front: String(front).slice(0, 500), back: String(back).slice(0, 1000), source: String(source).slice(0, 200),
+export function newCard({ kind, front, back, source = '', lists = [] }, now = Date.now()) {
+  return { id: uid(), kind, front: String(front).slice(0, 500), back: String(back).slice(0, 1000), source: String(source).slice(0, 200), lists: [...new Set(lists)],
     createdAt: now, updatedAt: now, due: now, interval: 0, ease: 2.5, reps: 0, lapses: 0 };
 }
 

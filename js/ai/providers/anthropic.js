@@ -40,12 +40,22 @@ export function normalizeMessages(messages) {
   return out;
 }
 
+/** Images jointes au DERNIER message utilisateur (blocs « image » base64, placés avant le texte). */
+function withImages(messages, images) {
+  if (!images?.length || !messages.length) return messages;
+  const out = messages.map((m) => ({ ...m }));
+  const i = out.length - 1;
+  if (out[i].role !== 'user') return out;
+  out[i].content = [...images.map((img) => ({ type: 'image', source: { type: 'base64', media_type: img.mimeType, data: img.base64 } })), { type: 'text', text: out[i].content }];
+  return out;
+}
+
 export function buildBody(req, cfg, stream) {
   return {
     model: cfg.model,
     max_tokens: req.maxTokens ?? DEFAULT_MAX_TOKENS,
     ...(req.system ? { system: req.system } : {}),
-    messages: normalizeMessages(req.messages),
+    messages: withImages(normalizeMessages(req.messages), req.images),
     ...(stream ? { stream: true } : {}),
     ...(req.temperature != null ? { temperature: req.temperature } : {}),
   };
@@ -64,7 +74,7 @@ export const anthropic = {
   defaultBaseUrl: BASE,
   requiresKey: true,
   requiresBaseUrl: false,
-  capabilities: { streaming: true, audioInput: false, jsonMode: false, listModels: true },
+  capabilities: { streaming: true, audioInput: false, imageInput: true, jsonMode: false, listModels: true },
 
   async complete(cfg, req, ctx) {
     const label = this.label;

@@ -224,3 +224,12 @@ test('withRetry : s\'arrête dès qu\'une erreur n\'est pas réessayable', async
   await assert.rejects(withRetry(async () => { n++; throw new AIError('auth', 'x'); }, { sleep: noSleep() }), (e) => e.attempts === 1);
   assert.equal(n, 1);
 });
+
+test('Images : refusées si le principal ne les gère pas (custom) ; secours incompatible jamais utilisé ; clé absente des erreurs', async () => {
+  const images = [{ mimeType: 'image/jpeg', base64: 'QUJD' }];
+  const f = fakeFetch(router({ localhost: () => openaiOk('x') }));
+  await assert.rejects(mk(cfg({ provider: 'custom', model: 'm', baseUrl: 'http://localhost:1234/v1' }), f).ask({ ...REQ, images }), (e) => e.kind === 'validation'); assert.equal(f.calls.length, 0);
+  const f2 = fakeFetch(router({ 'openai.com': () => json({ error: { type: 'server_error' } }, 503), localhost: () => openaiOk('NON') }));
+  await assert.rejects(mk(cfg({ provider: 'openai', model: 'o', apiKey: KEY_B }, { enabled: true, provider: 'custom', model: 'm', baseUrl: 'http://localhost:1234/v1' }), f2).ask({ ...REQ, images }), (e) => e.kind === 'unavailable');
+  assert.equal(f2.calls.filter((c) => c.url.includes('localhost')).length, 0);
+});
