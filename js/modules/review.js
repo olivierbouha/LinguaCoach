@@ -66,7 +66,7 @@ export async function render(root, ctx) {
       h('div', { class: 'field' }, h('label', { for: 'rv-back' }, t('review.back')), h('input', { id: 'rv-back', name: 'back', class: 'input', required: true, maxlength: 400 })),
       h('button', { class: 'btn', type: 'submit' }, t('common.add')));
 
-    root.replaceChildren(h('h1', {}, t('review.title')), block, form, list);
+    root.replaceChildren(h('h1', {}, t('review.title')), h('p', {}, h('a', { href: '#/study' }, t('home.studyOpen'))), block, form, list);
   }
 
   await load();
