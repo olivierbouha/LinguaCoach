@@ -14,6 +14,7 @@ import { VERBS, getVerbs, checkForm } from '../js/content/verbs.js';
 import { vocabGenSystemPrompt, normalizeVocabList, translationGenSystemPrompt, normalizeTranslationItems } from '../js/ai/prompts.js';
 import { TUTORS, SCENARIOS, getTutor, getScenario, scenariosForLevel } from '../js/tutors.js';
 import { sessionSummarySystemPrompt, normalizeSessionSummary } from '../js/ai/prompts.js';
+import { dailyPlan } from '../js/progress.js';
 import { sessionStats, fmtDuration } from '../js/modules/conversation.js';
 import { SSEParser } from '../js/ai/http.js';
 import { parseWritingReply, parseSections, extractJson, normalizeGeneratedExercise, writingSystemPrompt, speakingSystemPrompt, listeningGenSystemPrompt, SPEAKING_SECTIONS } from '../js/ai/prompts.js';
@@ -389,4 +390,25 @@ test('normalizeTranslationItems : paires source/cible valides uniquement', () =>
   const r = normalizeTranslationItems({ items: [{ source: 'Bonjour', target: 'Hallo' }, { source: 'x' }, { target: 'y' }] });
   assert.deepEqual(r, [{ source: 'Bonjour', target: 'Hallo' }]);
   assert.match(translationGenSystemPrompt(P({ language: 'nl' }), { count: 5 }), /exactly 5/);
+});
+
+/* ---------- plan du jour, premier lancement, voix non vérifiée ---------- */
+test('dailyPlan : étapes réellement faites aujourd\'hui, exercice choisi = le moins pratiqué', () => {
+  const now = Date.UTC(2026, 10, 2, 12); const day = 86400000;
+  const act = (skill, ts) => ({ id: skill + ts, skill, type: 'x', ts });
+  let p = dailyPlan([], { dueCount: 0, cardCount: 0, now });
+  assert.deepEqual(p.map((s) => s.id), ['words', 'writing', 'speak']); assert.ok(p.every((s) => !s.done));
+  p = dailyPlan([act('writing', now - 3 * day), act('listening', now - day)], { dueCount: 4, cardCount: 9, now });
+  assert.deepEqual(p.map((s) => [s.id, s.done]), [['review', false], ['writing', false], ['speak', false]]);
+  p = dailyPlan([act('writing', now - 10), act('speaking', now - 5)], { dueCount: 0, cardCount: 9, now });
+  assert.deepEqual(p.map((s) => [s.id, s.done]), [['review', true], ['listening', false], ['speak', true]]);
+  p = dailyPlan([act('writing', now - 10), act('listening', now - 5)], { dueCount: 0, cardCount: 1, now });
+  assert.ok(p[1].done);
+});
+test('Préférences : onboarded est un booléen strict (faux par défaut, jamais déduit)', () => {
+  assert.equal(P().onboarded, false); assert.equal(P({ onboarded: 'yes' }).onboarded, false); assert.equal(P({ onboarded: true }).onboarded, true);
+});
+test('describeVoice : voix non vérifiée = avertissement honnête (pas « impossible »)', () => {
+  const d = describeVoice({ voice: null, quality: 'none', requested: 'nl-NL', unverified: true });
+  assert.equal(d.level, 'warn'); assert.match(d.text, /aucune voix/); assert.match(d.text, /pas vérifiables/); assert.doesNotMatch(d.text, /pas possible/);
 });

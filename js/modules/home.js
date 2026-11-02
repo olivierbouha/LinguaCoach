@@ -4,7 +4,7 @@
  */
 import { h, formatDateTime } from '../utils.js';
 import { svg, icon, banner } from '../ui.js';
-import { computeStats, dueCards, suggestNext, suggestLevelShift } from '../progress.js';
+import { computeStats, dueCards, suggestNext, suggestLevelShift, dailyPlan } from '../progress.js';
 import { backupReminderDue, daysSinceBackup } from '../backup.js';
 import { TOPICS, PROFILES, getAccent } from '../config.js';
 
@@ -55,6 +55,24 @@ export async function render(root, ctx) {
       ? t('home.levelUp', { pct: Math.round(shift.accuracy * 100), n: shift.n, next: shift.next })
       : t('home.levelDown', { pct: Math.round(shift.accuracy * 100), n: shift.n, next: shift.next }),
     ' ', h('a', { href: '#/settings' }, t('home.levelLink'))));
+  }
+
+  // Premier lancement : proposition (non bloquante) de l'assistant
+  if (!prefs.onboarded && !hasData) {
+    out.push(h('section', { class: 'card' }, h('h2', {}, t('welcome.cardTitle')), h('p', {}, t('welcome.cardText')),
+      h('a', { class: 'btn btn-primary', href: '#/welcome' }, t('welcome.cardCta'))));
+  }
+
+  // Plan du jour
+  {
+    const plan = dailyPlan(activities, { dueCount: due.length, cardCount: vocab.length + errors.length });
+    const doneN = plan.filter((s) => s.done).length;
+    out.push(h('section', { class: 'card' },
+      h('h2', {}, t('plan.title')), h('p', { class: 'muted' }, doneN === plan.length ? t('plan.allDone') : t('plan.hint')),
+      h('ul', { class: 'plan' }, plan.map((s) => h('li', { class: s.done ? 'plan-done' : '' },
+        h('span', { class: 'plan-mark', 'aria-hidden': 'true' }, s.done ? '✓' : '○'),
+        h('a', { href: `#/${s.route}` }, t(`plan.step.${s.id}`, { n: due.length })),
+        h('span', { class: 'sr-only' }, s.done ? ` (${t('plan.done')})` : ` (${t('plan.todo')})`))))));
   }
 
   // Objectif + série

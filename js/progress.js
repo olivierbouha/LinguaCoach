@@ -80,6 +80,23 @@ export function suggestNext(stats, dueCount) {
   return { kind: pool[0][0], reason: pool[0][1].count === 0 ? 'never-practised' : 'least-recent' };
 }
 
+/**
+ * Plan du jour (≈10 min) : révision, un exercice, une prise de parole. Calculé localement ; « fait » = activité réellement enregistrée aujourd'hui.
+ * @returns {{id: string, route: string, done: boolean}[]}
+ */
+export function dailyPlan(activities, { dueCount = 0, cardCount = 0, now = Date.now() } = {}) {
+  const today = dayKey(now);
+  const todays = activities.filter((a) => dayKey(a.ts) === today);
+  const did = (skill) => todays.some((a) => a.skill === skill);
+  const last = (skill) => Math.max(0, ...activities.filter((a) => a.skill === skill).map((a) => a.ts));
+  const practice = ['writing', 'listening'].sort((a, b) => (did(a) - did(b)) || last(a) - last(b))[0]; // celui pas encore fait aujourd'hui, le moins récent d'abord
+  return [
+    cardCount === 0 ? { id: 'words', route: 'study', done: false } : { id: 'review', route: 'review', done: dueCount === 0 },
+    { id: practice, route: practice, done: did(practice) },
+    { id: 'speak', route: 'conversation', done: did('speaking') },
+  ];
+}
+
 /* ------------------------------------------------------------------ */
 /* Répétition espacée (SM-2 simplifié)                                  */
 /* ------------------------------------------------------------------ */

@@ -41,9 +41,9 @@ export async function render(root, ctx) {
   async function speak(text, btn) {
     if (speaking) { speaking.cancel(); speaking = null; return; }
     const pick = await ctx.voicePick();
-    if (!pick.voice) { toast(t('speech.noVoice'), { kind: 'warn' }); return; }
+    if (!pick.voice && !pick.unverified) { toast(t('speech.noVoice'), { kind: 'warn' }); return; }
     const p = ctx.prefs();
-    speaking = speakSequence([{ text }], { voice: pick.voice, lang: pick.voice.lang, rate: p.speechRate });
+    speaking = speakSequence([{ text }], { voice: pick.voice, lang: pick.voice?.lang ?? pick.requested, rate: p.speechRate });
     btn.setAttribute('aria-pressed', 'true');
     speaking.done.then(() => { btn.setAttribute('aria-pressed', 'false'); speaking = null; });
   }

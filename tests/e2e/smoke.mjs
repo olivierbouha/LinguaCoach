@@ -42,7 +42,7 @@ const track = (page) => { const errs = []; page.on('pageerror', (e) => errs.push
   const ctx = await newCtx(); const page = await ctx.newPage(); const errs = track(page);
   await page.goto(BASE + '?debug#/listening'); await page.waitForSelector('#view h1');
   const status = await page.textContent('#view .banner');
-  check('Écoute : état de la voix affiché honnêtement', /Voix utilisée|Aucune voix|Repli/.test(status), status.slice(0, 90));
+  check('Écoute : état de la voix affiché honnêtement', /Voix utilisée|Aucune voix|Repli|ne liste aucune voix/.test(status), status.slice(0, 90));
   check('Écoute : transcription masquée par défaut', (await page.$('.transcript')) === null);
   await page.click('text=Afficher la transcription'); check('Écoute : transcription affichable', (await page.$('.transcript')) !== null);
   const nq = await page.$$eval('fieldset.question', (f) => f.length);
@@ -334,6 +334,34 @@ const track = (page) => { const errs = []; page.on('pageerror', (e) => errs.push
   await page.goto(BASE + '?debug#/study'); await page.click('button:has-text("Verbes")'); await page.click('button:has-text("Tableau")');
   check('Verbes (EN) : tableau anglais', (await page.textContent('.verb-table')).includes('went') && (await page.textContent('.verb-table')).includes('gone/been'));
   check('Étudier : aucune erreur JS', errs.length === 0, errs.join(' | '));
+  await ctx.close();
+}
+
+/* ---- 6e. Premier lancement, plan du jour, voix non vérifiée ---- */
+{
+  const ctx = await newCtx(); const page = await ctx.newPage(); const errs = track(page);
+  await page.goto(BASE + '?debug'); await page.waitForSelector('#view h1');
+  const home = await page.textContent('#view');
+  check('Accueil (neuf) : proposition de configuration + plan du jour de 3 étapes, rien de coché', home.includes('Premier lancement') && home.includes('Plan du jour') && (await page.$$('.plan li')).length === 3 && (await page.$$('.plan-done')).length === 0);
+  await page.click('a[href="#/welcome"]'); await page.waitForSelector('h1:has-text("Bienvenue sur LinguaCoach")');
+  await page.click('button:has-text("Terminer")'); await page.waitForSelector('#view h1');
+  check('Assistant : « Terminer » enregistre onboarded et la carte disparaît de l\'accueil', await page.evaluate(() => window.__lc.ctx.prefs().onboarded === true) && !(await page.textContent('#view')).includes('Premier lancement'));
+  await ctx.close();
+}
+{
+  // Voix non vérifiée : le navigateur n'énumère aucune voix mais la synthèse existe
+  const ctx = await newCtx({}, { noSpeech: false });
+  await ctx.addInitScript(() => {
+    window.__spoken = [];
+    window.SpeechSynthesisUtterance = class { constructor(t) { this.text = t; } };
+    Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: { speak(u) { window.__spoken.push([u.text, u.lang]); setTimeout(() => u.onend?.({}), 5); }, cancel() {}, getVoices: () => [], addEventListener() {}, removeEventListener() {} } });
+  });
+  const page = await ctx.newPage(); const errs = track(page);
+  await page.goto(BASE + '?debug#/speaking'); await page.waitForSelector('.big-text');
+  check('Voix non vérifiée : boutons d\'écoute actifs + avertissement honnête', !(await page.isDisabled('button:has-text("Écouter")')) && (await page.textContent('#view')).includes('pas vérifiables'));
+  await page.click('button:has-text("Écouter")'); await page.waitForFunction(() => window.__spoken.length > 0, null, { timeout: 5000 });
+  check('Voix non vérifiée : la lecture est tentée avec la langue demandée (en-US)', (await page.evaluate(() => window.__spoken[0][1])) === 'en-US');
+  check('Voix non vérifiée : aucune erreur JS', errs.length === 0, errs.join(' | '));
   await ctx.close();
 }
 

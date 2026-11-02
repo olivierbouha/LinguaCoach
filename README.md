@@ -121,6 +121,12 @@ Accessible depuis l'accueil et l'écran Révision (`#/study`).
 - **Traduction** : de votre langue vers la langue apprise, à partir de vos cartes de Révision (hors ligne, la carte est notée selon le résultat) ou de phrases générées par l'IA. Correction locale par comparaison de mots ; une traduction juste mais différente peut être validée manuellement.
 - **Verbes irréguliers** : liste fixe rédigée à la main (70 verbes anglais, 53 néerlandais avec auxiliaire), tableau et entraînement hors ligne. **Non relue par un natif** : à vérifier dans un dictionnaire avant usage sérieux.
 
+### Premier lancement et plan du jour (v1.4)
+
+- **Assistant de premier lancement** (`#/welcome`) : langue apprise, variante, niveau, langue maternelle, objectif quotidien. Proposé par une carte sur l'accueil (non bloquant, pas de redirection) ; aucune clé n'y est demandée.
+- **Plan du jour (≈ 10 min)** sur l'accueil : réviser (ou ajouter des mots si aucune carte), un exercice d'écriture ou d'écoute (celui pas encore fait aujourd'hui, le moins récent d'abord), une prise de parole avec un tuteur. Une étape n'est cochée que si l'activité est réellement enregistrée.
+- **Voix « non vérifiée »** : si le navigateur n'énumère aucune voix (cas observé sur certains Android) alors que la synthèse existe, Écriture, Écoute, Oral et l'appel tentent la lecture avec la seule langue, en le signalant. S'il existe des voix mais aucune de la bonne langue, rien n'est lu.
+
 ### Néerlandais
 
 Réglages › Apprentissage › Langue apprise. Variantes `nl-NL` et `nl-BE` (néerlandais standard flamand, pas de dialecte), lexique `{mobile}` → mobiel/gsm, friet/frieten, spoor/perron, broodje/pistolet. Contenu local : 25 phrases, 5 dialogues, 10 mini-histoires. Les consignes IA nomment la langue et la variante. Les voix `nl-BE`/`nl-NL` dépendent de l'appareil.
@@ -142,10 +148,10 @@ Réglages › Données : export JSON (préférences non sensibles, conversations
 ## 8. Tests
 
 ```bash
-npm test                                   # 115 tests unitaires/intégration (node:test, aucun réseau)
+npm test                                   # 118 tests unitaires/intégration (node:test, aucun réseau)
 python3 -m http.server 8080 &              # puis, avec Playwright installé :
-node tests/e2e/smoke.mjs                   # 78 vérifications dans Chromium (API IA simulées via page.route)
-npm i axe-core && node tests/e2e/a11y.mjs node_modules/axe-core/axe.min.js   # audit axe-core, 16 vues (8 écrans × clair/sombre)
+node tests/e2e/smoke.mjs                   # 83 vérifications dans Chromium (API IA simulées via page.route)
+npm i axe-core && node tests/e2e/a11y.mjs node_modules/axe-core/axe.min.js   # audit axe-core, 18 vues (9 écrans × clair/sombre)
 ```
 
 ### Résultats réels (exécutés pendant le développement)
