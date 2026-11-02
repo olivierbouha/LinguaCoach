@@ -180,3 +180,10 @@ fieldset { border: 1px solid var(--border); border-radius: 14px; margin: 10px 0;
 .call .mic-btn:focus-visible { outline: 3px solid var(--text); outline-offset: 3px; }
 .call-more { margin-top: .25rem; }
 .summary-head { display: flex; align-items: center; gap: 12px; }
+
+/* Étudier */
+.tabs { margin: .5rem 0 1rem; flex-wrap: wrap; }
+.table-wrap { overflow-x: auto; margin: .75rem 0; }
+.verb-table { border-collapse: collapse; width: 100%; font-size: .92rem; }
+.verb-table caption { text-align: left; color: var(--muted); padding-bottom: .4rem; }
+.verb-table th, .verb-table td { border-bottom: 1px solid var(--border); padding: .4rem .5rem; text-align: left; white-space: nowrap; }

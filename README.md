@@ -114,6 +114,13 @@ Il suffirait d'ajouter un adaptateur `custom` pointant vers ce backend (même pr
 - **Bilan de fin de session** : statistiques locales immédiates (durée, prises de parole, mots transcrits) ; bilan IA à la demande (points forts, erreurs, vocabulaire), à partir de la transcription seule, avec ajout en un clic à **Révision**.
 - L'IA ne reçoit que la **transcription** : elle ne juge pas la prononciation. Aucun audio n'est conservé ; consentement avant envoi comme ailleurs. Les sessions sont enregistrées localement (`kind: 'voice'`, avec tuteur, scénario, durée, bilan), exportées dans la sauvegarde et séparées des conversations d'écriture.
 
+### Étudier : vocabulaire, traduction, verbes irréguliers (v1.3)
+
+Accessible depuis l'accueil et l'écran Révision (`#/study`).
+- **Vocabulaire par l'IA** : liste de mots (traduction + exemple) selon la langue, le niveau, le thème ou un sujet libre ; les mots déjà présents dans vos cartes sont exclus ; réponse JSON validée ; vous cochez les mots à ajouter à Révision. Texte envoyé au fournisseur après consentement.
+- **Traduction** : de votre langue vers la langue apprise, à partir de vos cartes de Révision (hors ligne, la carte est notée selon le résultat) ou de phrases générées par l'IA. Correction locale par comparaison de mots ; une traduction juste mais différente peut être validée manuellement.
+- **Verbes irréguliers** : liste fixe rédigée à la main (70 verbes anglais, 53 néerlandais avec auxiliaire), tableau et entraînement hors ligne. **Non relue par un natif** : à vérifier dans un dictionnaire avant usage sérieux.
+
 ### Néerlandais
 
 Réglages › Apprentissage › Langue apprise. Variantes `nl-NL` et `nl-BE` (néerlandais standard flamand, pas de dialecte), lexique `{mobile}` → mobiel/gsm, friet/frieten, spoor/perron, broodje/pistolet. Contenu local : 25 phrases, 5 dialogues, 10 mini-histoires. Les consignes IA nomment la langue et la variante. Les voix `nl-BE`/`nl-NL` dépendent de l'appareil.
@@ -135,10 +142,10 @@ Réglages › Données : export JSON (préférences non sensibles, conversations
 ## 8. Tests
 
 ```bash
-npm test                                   # 111 tests unitaires/intégration (node:test, aucun réseau)
+npm test                                   # 115 tests unitaires/intégration (node:test, aucun réseau)
 python3 -m http.server 8080 &              # puis, avec Playwright installé :
-node tests/e2e/smoke.mjs                   # 66 vérifications dans Chromium (API IA simulées via page.route)
-npm i axe-core && node tests/e2e/a11y.mjs node_modules/axe-core/axe.min.js   # audit axe-core, 14 vues (7 écrans × clair/sombre)
+node tests/e2e/smoke.mjs                   # 78 vérifications dans Chromium (API IA simulées via page.route)
+npm i axe-core && node tests/e2e/a11y.mjs node_modules/axe-core/axe.min.js   # audit axe-core, 16 vues (8 écrans × clair/sombre)
 ```
 
 ### Résultats réels (exécutés pendant le développement)
@@ -176,4 +183,5 @@ Des bugs réels trouvés et corrigés grâce à ces tests : lecture de flux muet
 - Le stockage du navigateur peut être purgé (surtout iOS) : exportez régulièrement ; un bouton demande le stockage persistant.
 - Interface en anglais : partielle (repli sur le français). Contenu local : 40 exercices par langue (25 phrases, 5 dialogues, 10 mini-histoires) ; contenu néerlandais écrit sans relecture par un natif ; l'IA peut en générer d'autres.
 - Appel vocal : testé uniquement avec une fausse reconnaissance/synthèse et une IA simulée dans Chromium ; qualité réelle de la reconnaissance du néerlandais, latence, écho et rendu visuel de l'avatar sur mobile non vérifiés. L'audit axe couvre l'écran de préparation, pas l'écran d'appel en cours.
+- Étudier : la génération IA n'a été testée qu'avec des réponses simulées (qualité réelle des mots/traductions non vérifiée) ; l'audit axe ne couvre que l'onglet Vocabulaire par défaut.
 - Pas de tests de charge, de revue de sécurité externe ni d'audit manuel d'accessibilité.

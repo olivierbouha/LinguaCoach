@@ -285,6 +285,58 @@ const track = (page) => { const errs = []; page.on('pageerror', (e) => errs.push
   await ctx.close();
 }
 
+/* ---- 6d. Étudier : vocabulaire IA, traduction hors ligne, verbes irréguliers ---- */
+{
+  const ctx = await newCtx(); const page = await ctx.newPage(); const errs = track(page);
+  let calls = 0;
+  await page.route('https://api.openai.com/**', async (route) => {
+    calls++;
+    const md = JSON.stringify({ items: [{ word: 'de fiets', translation: 'le vélo', example: 'Ik ga met de fiets.' }, { word: 'het huis', translation: 'la maison', example: 'Het huis is groot.' }] });
+    await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ choices: [{ message: { content: md }, finish_reason: 'stop' }] }) });
+  });
+  await page.goto(BASE + '?debug#/study'); await page.waitForSelector('#view h1');
+  check('Étudier : sans IA, la génération est désactivée avec explication', await page.isDisabled('button:has-text("Générer la liste")') && (await page.textContent('#view')).includes('nécessite un fournisseur IA'));
+  await page.goto(BASE + '?debug#/settings'); await page.waitForSelector('#ai-primary-prov');
+  await page.selectOption('#ai-primary-prov', 'openai');
+  await page.fill('#ai-primary-model', 'test-model'); await page.dispatchEvent('#ai-primary-model', 'change');
+  await page.fill('#ai-primary-key', 'sk-test-FAKEFAKEFAKEFAKEFAKE'); await page.dispatchEvent('#ai-primary-key', 'change');
+  await page.evaluate(() => window.__lc.ctx.setPrefs({ language: 'nl', accent: 'nl-NL', level: 'A2' }));
+  await page.goto(BASE + '?debug#/study'); await page.waitForSelector('button:has-text("Générer la liste"):not([disabled])');
+  await page.fill('#st-theme', 'transport');
+  await page.click('button:has-text("Générer la liste")'); await page.waitForSelector('dialog[open]');
+  check('Étudier : consentement demandé avant la génération', calls === 0);
+  await page.click('dialog button:has-text("Autoriser et envoyer")');
+  await page.waitForSelector('text=2 mots proposés', { timeout: 8000 });
+  check('Étudier : liste proposée avec traductions et exemples + avertissement IA', (await page.textContent('#view')).includes('de fiets') && (await page.textContent('#view')).includes('Ik ga met de fiets.') && (await page.textContent('#view')).includes('Généré par IA'));
+  await page.uncheck('#vw-1');
+  await page.click('button:has-text("Ajouter la sélection à la révision")'); await page.waitForSelector('.toast:has-text("1 mot(s) ajouté(s)")');
+  const cards = await page.evaluate(async () => (await window.__lc.ctx.store.all('vocab')).map((c) => [c.front, c.back]));
+  check('Étudier : seule la sélection est ajoutée à Révision', cards.length === 1 && cards[0][0] === 'de fiets' && cards[0][1].startsWith('le vélo'), JSON.stringify(cards));
+  // regénérer : le mot déjà connu est écarté
+  await page.click('button:has-text("Générer la liste")'); await page.waitForSelector('text=1 mots proposés', { timeout: 8000 });
+  check('Étudier : les mots déjà dans les cartes ne sont pas reproposés', !(await page.textContent('#view .card:has-text("mots proposés")')).includes('de fiets'));
+  // traduction hors ligne depuis les cartes
+  await page.click('button:has-text("Traduction")'); await page.click('button:has-text("Commencer")');
+  await page.waitForSelector('#tr-input');
+  check('Traduction : la consigne est dans la langue maternelle (verso de la carte)', (await page.textContent('.big-text')).trim() === 'le vélo');
+  await page.fill('#tr-input', 'de fietsen'); await page.click('button:has-text("Vérifier")');
+  check('Traduction : mauvaise réponse → attendu affiché, validation manuelle possible', (await page.textContent('#view')).includes('de fiets') && (await page.$('button:has-text("Ma réponse est aussi correcte")')) !== null);
+  await page.click('button:has-text("Ma réponse est aussi correcte")'); await page.waitForSelector('text=Terminé');
+  check('Traduction : score affiché et activité enregistrée', (await page.textContent('#view')).includes('Score : 1 sur 1') && (await page.evaluate(async () => (await window.__lc.ctx.store.all('activities')).some((a) => a.type === 'translation'))));
+  // verbes (néerlandais)
+  await page.click('button:has-text("Verbes")'); await page.click('button:has-text("Tableau")');
+  const tbl = await page.textContent('.verb-table');
+  check('Verbes (NL) : tableau complet avec formes et auxiliaire', tbl.includes('gingen') && tbl.includes('gegaan') && tbl.includes('aller (zijn)'));
+  await page.click('button:has-text("S\'entraîner")'); await page.click('button:has-text("Commencer")'); await page.waitForSelector('#vf-0');
+  await page.fill('#vf-0', 'zzz'); await page.fill('#vf-1', 'zzz'); await page.fill('#vf-2', 'zzz'); await page.click('button:has-text("Vérifier")');
+  check('Verbes : réponses fausses → formes attendues affichées', (await page.textContent('#view')).includes('Réponse attendue') && (await page.$$('.err-text')).length === 3);
+  await page.evaluate(() => window.__lc.ctx.setPrefs({ language: 'en', accent: 'en-US' }));
+  await page.goto(BASE + '?debug#/study'); await page.click('button:has-text("Verbes")'); await page.click('button:has-text("Tableau")');
+  check('Verbes (EN) : tableau anglais', (await page.textContent('.verb-table')).includes('went') && (await page.textContent('.verb-table')).includes('gone/been'));
+  check('Étudier : aucune erreur JS', errs.length === 0, errs.join(' | '));
+  await ctx.close();
+}
+
 /* ---- 7. Accessibilité axe-core : voir tests/e2e/a11y.mjs (script séparé) ---- */
 
 /* ---- 8. Clavier : navigation et focus visibles ---- */
