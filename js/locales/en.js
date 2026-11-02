@@ -14,6 +14,7 @@ export default {
   'study.title': 'Study', 'study.tabs': 'Sections', 'study.tab.vocab': 'Vocabulary', 'study.tab.translate': 'Translation', 'study.tab.verbs': 'Verbs',
   'study.generate': 'Generate list', 'study.start': 'Start', 'study.check': 'Check', 'study.next': 'Next', 'study.correct': 'Correct.',
   'welcome.title': 'Welcome to LinguaCoach', 'welcome.finish': 'Finish', 'welcome.skip': 'Skip', 'plan.title': 'Today\'s plan (≈ 10 min)',
+  'nav.lists': 'Lists', 'lists.title': 'Vocabulary lists', 'review.mode.quiz': 'Quiz', 'review.mode.cards': 'Cards', 'quiz.title': 'Quiz', 'quiz.start': 'Start quiz',
   'conv.title': 'Voice conversation', 'conv.logLabel': 'Voice conversation', 'conv.empty': 'Press “Start” to let the AI open the conversation, or the microphone to speak first.',
   'conv.emptyNoAi': 'Set up an AI provider in Settings to talk out loud.',
   'conv.start': 'Start', 'conv.stop': 'Stop', 'conv.new': 'New', 'conv.micStart': 'Speak', 'conv.micStop': 'Done',

@@ -365,6 +365,107 @@ const track = (page) => { const errs = []; page.on('pageerror', (e) => errs.push
   await ctx.close();
 }
 
+/* ---- 6f. Listes de vocabulaire, import par photos (IA simulée), quiz, génération par lots ---- */
+{
+  const ctx = await newCtx(); const page = await ctx.newPage(); const errs = track(page);
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  const reqs = [];
+  await page.route('https://api.openai.com/**', async (route) => {
+    const body = JSON.parse(route.request().postData()); reqs.push(body);
+    const all = JSON.stringify(body);
+    let md;
+    if (all.includes('PHOTOS')) md = JSON.stringify({ items: [
+      { word: 'de rivier', translation: 'rivière', example: '', form: '', uncertain: false },
+      { word: 'de piramide', translation: 'pyramide', example: '', form: '', uncertain: false },
+      { word: 'bewonen', translation: 'habiter', example: 'Zij bewoonden het land.', form: 'bewoonden', uncertain: false },
+      { word: 'het pad', translation: 'chemin', example: '', form: '', uncertain: false },
+      { word: 'onleesbaar', translation: '', example: '', form: '', uncertain: true }] });
+    else {
+      const n = Number((all.match(/exactly (\d+) useful/) ?? [])[1] ?? 5); const call = reqs.length;
+      md = JSON.stringify({ items: Array.from({ length: n }, (_, i) => ({ word: `woord${call}x${i}`, translation: `mot${call}x${i}`, example: '' })) });
+    }
+    await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ choices: [{ message: { content: md }, finish_reason: 'stop' }] }) });
+  });
+  await page.goto(BASE + '?debug#/settings'); await page.waitForSelector('#ai-primary-prov');
+  await page.selectOption('#ai-primary-prov', 'openai');
+  await page.fill('#ai-primary-model', 'test-model'); await page.dispatchEvent('#ai-primary-model', 'change');
+  await page.fill('#ai-primary-key', 'sk-test-FAKEFAKEFAKEFAKEFAKE'); await page.dispatchEvent('#ai-primary-key', 'change');
+  await page.evaluate(() => window.__lc.ctx.setPrefs({ language: 'nl', accent: 'nl-NL', level: 'A2', onboarded: true, aiConsent: { openai: true } }));
+  // --- listes
+  await page.goto(BASE + '?debug#/lists'); await page.waitForSelector('#ls-name');
+  await page.fill('#ls-name', 'Égypte'); await page.click('button:has-text("Créer")'); await page.waitForSelector('h2:has-text("Égypte")');
+  await page.fill('#ls-front', 'de rivier'); await page.fill('#ls-back', 'rivière'); await page.click('form button[type="submit"]'); await page.waitForSelector('li:has-text("de rivier")');
+  await page.click('button:has-text("Retour aux listes")'); await page.fill('#ls-name', 'Verbes'); await page.click('button:has-text("Créer")'); await page.waitForSelector('h2:has-text("Verbes")');
+  await page.click('button:has-text("Retour aux listes")');
+  await page.click('li:has-text("Égypte") button:has-text("Ouvrir")'); await page.waitForSelector('li:has-text("de rivier")');
+  await page.click('button:has-text("Modifier")'); await page.locator('.edit-row fieldset label:has-text("Verbes")').click(); await page.fill('.edit-row input[aria-label="Traduction"]', 'la rivière'); await page.click('button:has-text("Enregistrer")');
+  await page.waitForSelector('li:has-text("la rivière")');
+  const m1 = await page.evaluate(async () => { const v = await window.__lc.ctx.store.all('vocab'); const l = await window.__lc.ctx.store.all('lists'); return { n: v.length, lists: v[0].lists.length, back: v[0].back, names: l.map((x) => x.name).sort() }; });
+  check('Listes : créées, mot ajouté, modifié, membre de PLUSIEURS listes (une seule carte)', m1.n === 1 && m1.lists === 2 && m1.back === 'la rivière' && m1.names.join() === 'Verbes,Égypte', JSON.stringify(m1));
+  check('Listes : le mot affiche « Aussi dans » l\'autre liste', (await page.textContent('li:has-text("la rivière")')).includes('Aussi dans : Verbes'));
+  // --- photos
+  await page.click('button:has-text("Retour aux listes")'); await page.click('button:has-text("Ajouter depuis des photos")'); await page.waitForSelector('#ph-file', { state: 'attached' });
+  await page.setInputFiles('#ph-file', { name: 'page.png', mimeType: 'image/png', buffer: PNG }); await page.waitForSelector('.thumbs img');
+  check('Photos : aperçu affiché, bouton de lecture actif', !(await page.isDisabled('button:has-text("Lire 1 photo")')));
+  await page.click('button:has-text("Lire 1 photo")'); await page.waitForSelector('dialog[open]');
+  check('Photos : consentement détaillé AVANT envoi (mention des données visibles)', reqs.length === 0 && (await page.textContent('dialog')).includes('Envoyer vos photos') && (await page.textContent('dialog')).includes('visible sur la photo'));
+  await page.click('dialog button:has-text("Envoyer les photos")'); await page.waitForSelector('text=5 mots détectés', { timeout: 10000 });
+  const body = JSON.stringify(reqs[0]);
+  check('Photos : requête avec image JPEG en URL de données + consigne d\'extraction', body.includes('data:image/jpeg;base64,') && body.includes('INFINITIVE') && !body.includes('FAKEFAKE'));
+  const fv = await page.textContent('#view');
+  const vals = await page.$$eval('.found input[lang]', (i) => i.map((x) => x.value));
+  check('Photos : verbes (infinitif + forme vue), mot douteux décoché et signalé, mot connu signalé', vals.includes('bewonen') && fv.includes('bewoonden') && fv.includes('à vérifier') && fv.includes('déjà dans vos cartes') && !(await page.isChecked('#fd-4')) && (await page.isChecked('#fd-1')));
+  await page.fill('.found-row:nth-of-type(1) input[aria-label="Traduction"]', 'rivière', { timeout: 2000 }).catch(() => {});
+  await page.selectOption('#ph-dest', ''); await page.fill('input[placeholder^="ex. Histoire"]', 'Égypte 2'); await page.click('#ph-add');
+  await page.waitForSelector('h2:has-text("Égypte 2")');
+  const m2 = await page.evaluate(async () => { const v = await window.__lc.ctx.store.all('vocab'); const l = await window.__lc.ctx.store.all('lists'); const e2 = l.find((x) => x.name === 'Égypte 2'); return { n: v.length, inE2: v.filter((c) => c.lists.includes(e2.id)).map((c) => c.front).sort(), verb: v.find((c) => c.front === 'bewonen')?.back, riv: v.filter((c) => c.front.includes('rivier')).length, leak: JSON.stringify(v).includes('/9j/') || JSON.stringify(v).includes('iVBOR') }; });
+  check('Photos : 4 mots ajoutés à la nouvelle liste, « de rivier » déjà connu rejoint la liste SANS doublon', m2.n === 4 && m2.inE2.length === 4 && m2.riv === 1, JSON.stringify(m2));
+  check('Photos : forme conjuguée conservée dans la carte ; aucune image enregistrée', m2.verb === 'habiter — vu : bewoonden — Zij bewoonden het land.' && m2.leak === false, m2.verb);
+  // --- révision par liste + quiz
+  await page.goto(BASE + '?debug#/review'); await page.waitForSelector('#rv-list');
+  const opts = await page.$$eval('#rv-list option', (o) => o.map((x) => x.textContent));
+  check('Révision : sélecteur de liste (toutes, sans liste, chaque liste)', ['Toutes mes cartes', 'Sans liste', 'Égypte', 'Égypte 2', 'Verbes'].every((x) => opts.includes(x)), opts.join('|'));
+  await page.selectOption('#rv-list', { label: 'Égypte 2' });
+  check('Révision : filtrée sur la liste choisie (4 cartes)', (await page.textContent('#view')).includes('(4)') || (await page.$$('#view section ul li')).length === 4);
+  await page.click('button:has-text("Quiz")'); await page.waitForSelector('#qz-dir');
+  await page.click('button:has-text("Commencer le quiz")'); await page.waitForSelector('.choice-btn');
+  const map = { 'de rivier': 'la rivière', 'de piramide': 'pyramide', bewonen: 'habiter', 'het pad': 'chemin' };
+  let okAll = true;
+  for (let i = 0; i < 4; i++) {
+    await page.waitForSelector('.choice-btn:not([disabled])');
+    const prompt = (await page.textContent('.big-text')).trim(); const answer = map[prompt];
+    if ((await page.$$('.choice-btn')).length !== 4) okAll = false;
+    await page.click(`.choice-btn:text-is("${answer}")`); await page.waitForSelector('.ok-text');
+    await page.click('button:has-text("Suivant")');
+  }
+  await page.waitForSelector('h2:has-text("Terminé")');
+  check('Quiz (choix multiple, 4 options) : 4 bonnes réponses → score 4 sur 4', okAll && (await page.textContent('#view')).includes('Score : 4 sur 4'));
+  const qa = await page.evaluate(async () => ({ act: (await window.__lc.ctx.store.all('activities')).some((a) => a.type === 'quiz' && a.score.correct === 4), reps: (await window.__lc.ctx.store.all('vocab')).filter((c) => c.reps > 0).length }));
+  check('Quiz : activité enregistrée et calendrier des cartes mis à jour', qa.act && qa.reps === 4, JSON.stringify(qa));
+  await page.click('button:has-text("Recommencer")'); await page.selectOption('#qz-mode', 'type'); await page.selectOption('#qz-dir', 'rev'); await page.click('button:has-text("Commencer le quiz")'); await page.waitForSelector('#qz-input');
+  const p1 = (await page.textContent('.big-text')).trim(); const inv = Object.fromEntries(Object.entries(map).map(([k, v]) => [v, k]));
+  await page.fill('#qz-input', inv[p1].replace(/^(de|het) /, '').toUpperCase()); await page.click('button:has-text("Vérifier")');
+  check('Quiz (écrit, traduction → mot) : article et casse tolérés', (await page.textContent('.ok-text')).includes('Correct'));
+  // --- suppression d'une liste : les cartes restent
+  await page.goto(BASE + '?debug#/lists'); await page.waitForSelector('#ls-name');
+  await page.click('li:has-text("Égypte 2") button:has-text("Ouvrir")'); await page.click('button:has-text("Supprimer la liste")'); await page.waitForSelector('dialog[open]'); await page.click('dialog button:has-text("Supprimer")');
+  await page.waitForSelector('h2:has-text("Mes listes")');
+  const m3 = await page.evaluate(async () => ({ n: (await window.__lc.ctx.store.all('vocab')).length, l: (await window.__lc.ctx.store.all('lists')).map((x) => x.name).sort().join() }));
+  check('Liste supprimée : les 4 cartes sont conservées (rien n\'est perdu)', m3.n === 4 && m3.l === 'Verbes,Égypte', JSON.stringify(m3));
+  // --- génération IA par lots (100 mots = 2 requêtes de 50) vers une nouvelle liste
+  const before = reqs.length;
+  await page.goto(BASE + '?debug#/study'); await page.waitForSelector('#st-count');
+  await page.selectOption('#st-count', '100'); await page.fill('input[placeholder^="Nom de la nouvelle"]', 'IA 100');
+  await page.click('button:has-text("Générer la liste")'); await page.waitForSelector('text=100 mots proposés', { timeout: 15000 });
+  check('Génération IA : 100 mots obtenus en 2 lots de 50', reqs.length - before === 2 && JSON.stringify(reqs[before]).includes('exactly 50 useful'));
+  check('Génération IA : lot 2 demande d\'exclure les mots du lot 1', JSON.stringify(reqs[before + 1]).includes('woord' + (before + 1) + 'x0'));
+  await page.click('button:has-text("Ajouter la sélection à la révision")'); await page.waitForSelector('.toast:has-text("100 mot(s) ajouté(s)")');
+  const m4 = await page.evaluate(async () => { const l = (await window.__lc.ctx.store.all('lists')).find((x) => x.name === 'IA 100'); return l ? (await window.__lc.ctx.store.all('vocab')).filter((c) => c.lists.includes(l.id)).length : -1; });
+  check('Génération IA : les 100 mots sont dans la liste « IA 100 »', m4 === 100, String(m4));
+  check('Listes/Quiz/Photos : aucune erreur JS', errs.length === 0, errs.join(' | '));
+  await ctx.close();
+}
+
 /* ---- 7. Accessibilité axe-core : voir tests/e2e/a11y.mjs (script séparé) ---- */
 
 /* ---- 8. Clavier : navigation et focus visibles ---- */

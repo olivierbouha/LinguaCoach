@@ -11,10 +11,12 @@ import { banner, spinner, toast, icon } from '../ui.js';
 import { getLanguage } from '../config.js';
 import { vocabGenSystemPrompt, normalizeVocabList, translationGenSystemPrompt, normalizeTranslationItems, extractJson } from '../ai/prompts.js';
 import { getVerbs, checkForm } from '../content/verbs.js';
-import { normalizeWords } from '../text-compare.js';
-import { newCard, gradeCard, GRADES } from '../progress.js';
+import { gradeCard, GRADES } from '../progress.js';
+import { newList, planAddToList, wordKey, cardsOfList, checkTyped, ALL, NONE } from '../lists-utils.js';
 
 const SESSION_SIZE = 10;
+const COUNTS = [10, 15, 20, 50, 100, 150, 200];
+const BATCH = 50; // mots demandés par requête (les grandes listes sont générées par lots)
 const TABS = ['vocab', 'translate', 'verbs'];
 
 export async function render(root, ctx) {
@@ -38,39 +40,78 @@ export async function render(root, ctx) {
     let items = [];
     let busy = false;
     let err = null;
+    let progress = null; // { done, total }
+    let abort = null;
+    let lists = [];
+    let dest = { id: '', newName: '' };
     const theme = h('input', { id: 'st-theme', class: 'input', maxlength: 120, placeholder: t('study.themePh') });
-    const count = h('select', { id: 'st-count', class: 'input' }, [10, 15, 20].map((n) => h('option', { value: n, selected: n === 15 }, String(n))));
+    const count = h('select', { id: 'st-count', class: 'input' }, COUNTS.map((n) => h('option', { value: n, selected: n === 15 }, String(n))));
     const out = h('div', {});
+    const destBox = h('div', { class: 'field' });
+
+    const drawDest = () => destBox.replaceChildren(h('label', { for: 'st-dest' }, t('study.destination')),
+      h('select', { id: 'st-dest', class: 'input', onchange: (e) => { dest.id = e.target.value; drawDest(); } },
+        [h('option', { value: '', selected: !dest.id }, t('study.destNew')), ...lists.map((l) => h('option', { value: l.id, selected: dest.id === l.id }, l.name))]),
+      !dest.id ? h('input', { class: 'input', 'aria-label': t('lists.name'), placeholder: t('study.destNamePh'), maxlength: 100, value: dest.newName, oninput: (e) => { dest.newName = e.target.value; } }) : null);
 
     async function generate() {
       if (busy) return;
-      busy = true; err = null; drawOut();
+      busy = true; err = null; items = []; abort = new AbortController();
+      const total = Number(count.value);
+      progress = { done: 0, total };
+      drawOut();
       try {
         const have = (await store.all('vocab')).map((c) => c.front);
-        const r = await ctx.askAI({ system: vocabGenSystemPrompt(ctx.prefs(), { count: Number(count.value), theme: theme.value.trim(), exclude: have }), messages: [{ role: 'user', content: 'Generate the list now.' }], maxTokens: 1800 }, {});
-        const list = normalizeVocabList(extractJson(r.text));
-        if (!list.length) throw Object.assign(new Error(t('study.badList')), { kind: 'invalid_response' });
-        const haveSet = new Set(have.map((x) => x.toLowerCase()));
-        items = list.filter((x) => !haveSet.has(x.word.toLowerCase())).map((x) => ({ ...x, on: true }));
+        const haveSet = new Set(have.map((x) => wordKey(x)));
+        const seen = new Set();
+        let guard = 0;
+        while (progress.done < total && guard++ < 8 && !abort.signal.aborted) {
+          const want = Math.min(BATCH, total - progress.done);
+          const exclude = [...have, ...items.map((x) => x.word)];
+          const r = await ctx.askAI({ system: vocabGenSystemPrompt(ctx.prefs(), { count: want, theme: theme.value.trim(), exclude }), messages: [{ role: 'user', content: 'Generate the list now.' }], maxTokens: 4000 }, { signal: abort.signal });
+          const list = normalizeVocabList(extractJson(r.text), { max: 60 });
+          if (!list.length) { if (!items.length) throw Object.assign(new Error(t('study.badList')), { kind: 'invalid_response' }); break; }
+          let fresh = 0;
+          for (const x of list) {
+            const k = wordKey(x.word);
+            if (!k || haveSet.has(k) || seen.has(k)) continue;
+            seen.add(k); items.push({ ...x, on: true }); fresh++;
+          }
+          progress.done = items.length;
+          drawOut();
+          if (!fresh) break; // plus rien de nouveau : on s'arrête plutôt que de boucler
+        }
         if (!items.length) err = t('study.allKnown');
-      } catch (e) { err = e.message; items = []; }
-      busy = false;
+      } catch (e) { err = items.length ? `${e.message} ${t('study.partial', { n: items.length })}` : e.message; }
+      busy = false; abort = null; progress = null;
       if (!destroyed) drawOut();
     }
 
     async function addSelected() {
       const chosen = items.filter((x) => x.on);
-      for (const it of chosen) await store.put('vocab', newCard({ kind: 'vocab', front: it.word, back: it.example ? `${it.translation} — ${it.example}` : it.translation, source: 'ai-vocab' }));
+      if (!chosen.length) return;
+      let listId = dest.id;
+      if (!listId && dest.newName.trim()) {
+        const name = dest.newName.trim();
+        const ex = lists.find((l) => l.name.toLowerCase() === name.toLowerCase());
+        if (ex) listId = ex.id; else { const l = newList(name); await store.put('lists', l); lists = [...lists, l]; listId = l.id; dest = { id: l.id, newName: '' }; }
+      }
+      const vocab = await store.all('vocab');
+      const plan = planAddToList(vocab, chosen.map((it) => ({ front: it.word, back: it.example ? `${it.translation} — ${it.example}` : it.translation })), listId, { source: 'ai-vocab' });
+      if (plan.toPut.length) await store.bulkPut('vocab', plan.toPut);
       items = items.filter((x) => !x.on);
-      toast(t('study.added', { n: chosen.length }), { kind: 'success' });
-      drawOut();
+      toast(t('study.added', { n: plan.added + plan.joined }), { kind: 'success' });
+      drawDest(); drawOut();
     }
 
     function drawOut() {
       out.replaceChildren(...[
-        busy ? spinner(t('study.generating')) : null,
+        busy ? h('div', {}, spinner(t('study.generatingN', { done: progress?.done ?? 0, total: progress?.total ?? 0 })), h('button', { class: 'btn btn-small', type: 'button', onclick: () => abort?.abort() }, t('writing.stop'))) : null,
         err ? banner('error', err) : null,
         items.length ? h('section', { class: 'card' }, h('h2', {}, t('study.proposed', { n: items.length })),
+          h('div', { class: 'btn-row' },
+            h('button', { class: 'btn btn-small', type: 'button', onclick: () => { items.forEach((x) => { x.on = true; }); drawOut(); } }, t('study.selectAll')),
+            h('button', { class: 'btn btn-small', type: 'button', onclick: () => { items.forEach((x) => { x.on = false; }); drawOut(); } }, t('study.selectNone'))),
           h('ul', { class: 'list' }, items.map((it, i) => h('li', { class: 'list-item' },
             h('span', { class: 'choice' },
               h('input', { type: 'checkbox', id: `vw-${i}`, checked: it.on, onchange: (e) => { it.on = e.target.checked; } }),
@@ -84,15 +125,19 @@ export async function render(root, ctx) {
       !ctx.ai.isConfigured() ? banner('info', t('study.needAi'), ' ', h('a', { href: '#/settings' }, t('home.noAiLink'))) : null,
       h('section', { class: 'card' }, h('h2', {}, t('study.vocabTitle')), h('p', { class: 'muted' }, t('study.vocabHint')),
         h('div', { class: 'field' }, h('label', { for: 'st-theme' }, t('study.theme')), theme),
-        h('div', { class: 'field' }, h('label', { for: 'st-count' }, t('study.count')), count),
+        h('div', { class: 'field' }, h('label', { for: 'st-count' }, t('study.count')), count, h('p', { class: 'hint' }, t('study.countHint'))),
+        destBox,
         h('button', { class: 'btn btn-primary', type: 'button', disabled: !ctx.ai.isConfigured(), onclick: () => generate() }, t('study.generate'))),
       out);
-    drawOut();
+    store.all('lists').then((l) => { lists = l.sort((a, b) => a.name.localeCompare(b.name)); drawDest(); });
+    drawDest(); drawOut();
   }
 
   /* ================= Traduction ================= */
   function translateTab(box) {
     let source = 'cards';
+    let srcList = ALL;
+    let lists = [];
     let session = null; // { items, i, correct, checked, ok, typed }
     let busy = false;
     let err = null;
@@ -102,8 +147,9 @@ export async function render(root, ctx) {
       err = null;
       let items = [];
       if (source === 'cards') {
-        const cards = (await store.all('vocab')).filter((c) => c.back);
-        items = shuffle(cards).slice(0, SESSION_SIZE).map((c) => ({ prompt: c.back.split(' — ')[0], answer: c.front, card: c }));
+        const all = (await store.all('vocab')).filter((c) => c.back);
+        const cards = cardsOfList(all, lists, srcList);
+        items = shuffle(cards).slice(0, SESSION_SIZE).map((c) => ({ prompt: c.back.split(' — ')[0], answer: c.front, card: c, ignoreArticle: true }));
         if (!items.length) { err = t('study.noCards'); return draw(); }
       } else {
         if (!ctx.ai.isConfigured()) { err = t('study.needAi'); return draw(); }
@@ -123,10 +169,8 @@ export async function render(root, ctx) {
 
     function check(typed) {
       const it = session.items[session.i];
-      const a = normalizeWords(it.answer).join(' ');
-      const alts = it.answer.split(/\s*\/\s*/).map((x) => normalizeWords(x).join(' '));
       session.typed = typed;
-      session.ok = normalizeWords(typed).join(' ') === a || alts.includes(normalizeWords(typed).join(' '));
+      session.ok = checkTyped(it.answer, typed, { ignoreArticle: !!it.ignoreArticle });
       session.checked = true;
       draw();
     }
@@ -154,6 +198,8 @@ export async function render(root, ctx) {
             [['cards', t('study.srcCards')], ['ai', t('study.srcAi')]].map(([k, label]) => h('div', { class: 'choice' },
               h('input', { type: 'radio', name: 'tr-src', id: `tr-${k}`, checked: source === k, onchange: () => { source = k; } }),
               h('label', { for: `tr-${k}` }, label)))),
+          h('div', { class: 'field' }, h('label', { for: 'tr-list' }, t('study.fromList')), h('select', { id: 'tr-list', class: 'input', onchange: (e) => { srcList = e.target.value; } },
+            [[ALL, t('lists.all')], [NONE, t('lists.none')], ...lists.map((l) => [l.id, l.name])].map(([v, lab]) => h('option', { value: v, selected: v === srcList }, lab)))),
           h('button', { class: 'btn btn-primary', type: 'button', onclick: () => start() }, t('study.start'))));
       } else if (session?.done) {
         nodes.push(h('section', { class: 'card' }, h('h2', {}, t('study.finished')), h('p', {}, t('study.score', { c: session.correct, n: session.items.length })),
@@ -178,6 +224,7 @@ export async function render(root, ctx) {
       area.querySelector('#tr-input:not([disabled])')?.focus();
     }
     box.append(area);
+    store.all('lists').then((l) => { lists = l.sort((a, b) => a.name.localeCompare(b.name)); if (!session && !busy) draw(); });
     draw();
   }
 

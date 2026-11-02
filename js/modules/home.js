@@ -107,7 +107,7 @@ export async function render(root, ctx) {
   out.push(h('section', { class: 'card' },
     h('h2', {}, icon('book', 20), ' ', t('home.reviewTitle')),
     h('p', {}, t('home.reviewCounts', { vocab: vocab.length, errors: errors.length, due: due.length })),
-    h('div', { class: 'btn-row' }, h('a', { class: 'btn', href: '#/review' }, t('home.reviewOpen')), h('a', { class: 'btn', href: '#/study' }, t('home.studyOpen')))));
+    h('div', { class: 'btn-row' }, h('a', { class: 'btn', href: '#/review' }, t('home.reviewOpen')), h('a', { class: 'btn', href: '#/lists' }, t('lists.title')), h('a', { class: 'btn', href: '#/study' }, t('home.studyOpen')))));
 
   // Activité récente
   const recent = [...activities].sort((a, b) => b.ts - a.ts).slice(0, 5);

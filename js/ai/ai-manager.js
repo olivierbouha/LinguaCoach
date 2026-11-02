@@ -75,6 +75,7 @@ export class AIManager {
     if (!this.isUsable(fb)) return null;
     if (fb.provider.id === primary.provider.id && fb.cfg.model === primary.cfg.model && fb.cfg.baseUrl === primary.cfg.baseUrl) return null;
     if (req.audio && !fb.provider.capabilities.audioInput) return null;
+    if (req.images?.length && !fb.provider.capabilities.imageInput) return null;
     return fb;
   }
 
@@ -84,6 +85,10 @@ export class AIManager {
     if (!this.isUsable(primary)) throw new AIError('config', friendlyMessage('config'), { code: 'not_configured' });
     if (req.audio && !primary.provider.capabilities.audioInput) {
       throw new AIError('validation', `${primary.provider.label} ne prend pas en charge l'audio en entrée.`, { provider: primary.provider.id });
+    }
+
+    if (req.images?.length && !primary.provider.capabilities.imageInput) {
+      throw new AIError('validation', `${primary.provider.label} (ou le modèle choisi) n'est pas configuré pour recevoir des images ici.`, { provider: primary.provider.id });
     }
 
     this.#busy = true;

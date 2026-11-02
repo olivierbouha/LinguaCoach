@@ -92,7 +92,7 @@ test('Aller-retour export → import (remplacement) dans un Store vide', async (
   const text = JSON.stringify(await buildExport(a));
   const b = mkStore();
   const parsed = await parseBackup(text);
-  assert.deepEqual(parsed.counts, { conversations: 1, activities: 1, vocab: 1, errors: 1 });
+  assert.deepEqual(parsed.counts, { conversations: 1, activities: 1, vocab: 1, errors: 1, lists: 0 });
   await importBackup(b, parsed, { mode: 'replace' });
   assert.deepEqual(await b.all('conversations'), await a.all('conversations'));
   assert.deepEqual(await b.all('activities'), await a.all('activities'));

@@ -14,7 +14,7 @@ import {
 } from './config.js';
 import { clamp } from './utils.js';
 
-export const COLLECTIONS = ['conversations', 'activities', 'vocab', 'errors'];
+export const COLLECTIONS = ['conversations', 'activities', 'vocab', 'errors', 'lists'];
 const PREFS_KEY = 'lc.prefs';
 const KEYS_KEY = 'lc.keys';
 
@@ -77,7 +77,7 @@ export function createIDBBackend(name = 'linguacoach') {
   let dbPromise;
   const open = () =>
     (dbPromise ??= new Promise((resolve, reject) => {
-      const req = indexedDB.open(name, 1);
+      const req = indexedDB.open(name, 2); // v2 : collection « lists » (les anciens stores sont conservés)
       req.onupgradeneeded = () => {
         const db = req.result;
         for (const c of COLLECTIONS) if (!db.objectStoreNames.contains(c)) db.createObjectStore(c, { keyPath: 'id' });

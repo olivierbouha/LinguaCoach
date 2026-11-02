@@ -121,6 +121,13 @@ Accessible depuis l'accueil et l'écran Révision (`#/study`).
 - **Traduction** : de votre langue vers la langue apprise, à partir de vos cartes de Révision (hors ligne, la carte est notée selon le résultat) ou de phrases générées par l'IA. Correction locale par comparaison de mots ; une traduction juste mais différente peut être validée manuellement.
 - **Verbes irréguliers** : liste fixe rédigée à la main (70 verbes anglais, 53 néerlandais avec auxiliaire), tableau et entraînement hors ligne. **Non relue par un natif** : à vérifier dans un dictionnaire avant usage sérieux.
 
+### Listes de vocabulaire, photos et quiz (v1.5)
+
+- **Listes nommées** (`#/lists`) : créer, renommer, supprimer ; ajouter, modifier ou retirer des mots ; **un mot peut appartenir à plusieurs listes** (une seule carte, pas de doublon : « de rivier » et « rivier » sont reconnus comme le même mot). Supprimer une liste **ne supprime jamais les cartes**. Les listes et appartenances sont dans l'export JSON ; une sauvegarde plus ancienne (sans listes) reste importable (en mode « remplacer », elle vide aussi les listes actuelles).
+- **Import par photos** : une ou plusieurs photos (appareil photo ou galerie), réduites (1600 px, JPEG) puis lues par l'IA (Gemini, OpenAI ou Anthropic ; un fournisseur « custom » n'est pas considéré comme compatible). Texte imprimé **et manuscrit** conservés ; noms avec article, **verbes à l'infinitif avec la forme conjuguée vue** (« habiter — vu : bewoonden »). Vous relisez, corrigez, décochez avant d'ajouter ; les mots douteux sont signalés « à vérifier » et décochés. Consentement détaillé **à chaque envoi** de photos ; les photos ne sont pas conservées.
+- **Révision par liste** (`#/review/<liste>` ou sélecteur) en **cartes** ou en **quiz** (choix multiple à 4 options, ou réponse écrite ; sens mot → traduction ou inverse). Le quiz met aussi à jour le calendrier des cartes.
+- **Génération IA** jusqu'à **200 mots** (10 à 200), par lots de 50 (plusieurs requêtes), avec destination dans une liste nouvelle ou existante ; le devoir de traduction peut aussi se limiter à une liste.
+
 ### Premier lancement et plan du jour (v1.4)
 
 - **Assistant de premier lancement** (`#/welcome`) : langue apprise, variante, niveau, langue maternelle, objectif quotidien. Proposé par une carte sur l'accueil (non bloquant, pas de redirection) ; aucune clé n'y est demandée.
@@ -148,10 +155,10 @@ Réglages › Données : export JSON (préférences non sensibles, conversations
 ## 8. Tests
 
 ```bash
-npm test                                   # 118 tests unitaires/intégration (node:test, aucun réseau)
+npm test                                   # 128 tests unitaires/intégration (node:test, aucun réseau)
 python3 -m http.server 8080 &              # puis, avec Playwright installé :
-node tests/e2e/smoke.mjs                   # 83 vérifications dans Chromium (API IA simulées via page.route)
-npm i axe-core && node tests/e2e/a11y.mjs node_modules/axe-core/axe.min.js   # audit axe-core, 18 vues (9 écrans × clair/sombre)
+node tests/e2e/smoke.mjs                   # 101 vérifications dans Chromium (API IA simulées via page.route)
+npm i axe-core && node tests/e2e/a11y.mjs node_modules/axe-core/axe.min.js   # audit axe-core, 20 vues (10 écrans × clair/sombre)
 ```
 
 ### Résultats réels (exécutés pendant le développement)
@@ -190,4 +197,5 @@ Des bugs réels trouvés et corrigés grâce à ces tests : lecture de flux muet
 - Interface en anglais : partielle (repli sur le français). Contenu local : 40 exercices par langue (25 phrases, 5 dialogues, 10 mini-histoires) ; contenu néerlandais écrit sans relecture par un natif ; l'IA peut en générer d'autres.
 - Appel vocal : testé uniquement avec une fausse reconnaissance/synthèse et une IA simulée dans Chromium ; qualité réelle de la reconnaissance du néerlandais, latence, écho et rendu visuel de l'avatar sur mobile non vérifiés. L'audit axe couvre l'écran de préparation, pas l'écran d'appel en cours.
 - Étudier : la génération IA n'a été testée qu'avec des réponses simulées (qualité réelle des mots/traductions non vérifiée) ; l'audit axe ne couvre que l'onglet Vocabulaire par défaut.
+- Photos : testées avec une image minimale et une IA simulée ; la lecture réelle d'une page manuscrite (comme celle de votre cahier) n'est pas vérifiée et dépendra du modèle. Les formats HEIC ne sont lisibles que si le navigateur sait les décoder. L'audit axe couvre l'aperçu des listes, pas l'écran photo, le détail d'une liste ni le quiz.
 - Pas de tests de charge, de revue de sécurité externe ni d'audit manuel d'accessibilité.
